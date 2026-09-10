@@ -42,19 +42,23 @@ export default async function TreinoPage({
         .select("*")
         .in("exercicio_id", doModelo.map((e) => e.exercicio_id));
 
+      // View não carrega NOT NULL: no tipo gerado toda coluna vem anulável,
+      // mesmo as que a tabela de origem garante. Filtra em vez de usar `!`.
       const porExercicio = new Map<string, UltimoDesempenho[]>();
       for (const a of (anteriores ?? []) as UltimoDesempenho[]) {
+        if (!a.exercicio_id || a.indice == null) continue;
         porExercicio.set(a.exercicio_id, [...(porExercicio.get(a.exercicio_id) ?? []), a]);
       }
 
       exercicios = doModelo.map((e) => {
-        const ant = (porExercicio.get(e.exercicio_id) ?? []).sort((a, b) => a.indice - b.indice);
+        const ant = (porExercicio.get(e.exercicio_id) ?? [])
+          .sort((a, b) => (a.indice ?? 0) - (b.indice ?? 0));
         return {
           exercicioId: e.exercicio_id,
           nome: e.nome_snapshot,
           modoMedicao: e.modo_medicao_snapshot,
           anterior: ant.map((a) => ({
-            indice: a.indice, pesoKg: a.peso_kg, reps: a.reps, e1rm: a.e1rm,
+            indice: a.indice ?? 0, pesoKg: a.peso_kg, reps: a.reps, e1rm: a.e1rm,
           })),
           anteriorEm: ant[0]?.data_local ?? null,
         };
