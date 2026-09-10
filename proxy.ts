@@ -7,7 +7,7 @@ import { atualizarSessao } from "@/lib/supabase/proxy";
  *
  * REGRA (D-009): o gate de auth NÃO fica na frente do shell offline. Falha de
  * refresh bloqueia SINCRONIZAÇÃO, nunca USO. Quando o service worker entrar,
- * `/treino` tem que renderizar do IndexedDB mesmo sem sessão válida — por isso
+ * `/sessao` tem que renderizar do IndexedDB mesmo sem sessão válida — por isso
  * essa rota está fora do matcher. Redirecionar ela pra /login mataria o
  * requisito de abrir na academia sem sinal.
  */
@@ -38,6 +38,6 @@ export async function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     // Tudo, menos estáticos, imagens, o service worker e a rota de treino.
-    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|treino|.*\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|sessao|.*\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };

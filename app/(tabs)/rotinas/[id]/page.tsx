@@ -100,7 +100,7 @@ export default async function RotinaPage({ params }: PageProps<"/rotinas/[id]">)
         )}
 
         <Link
-          href={`/treino?rotina=${rotina.id}`}
+          href={`/sessao?rotina=${rotina.id}`}
           className="mt-3 block rounded-2xl bg-accent text-black font-semibold py-4 text-center"
         >
           Iniciar rotina

@@ -22,7 +22,7 @@ interface ItemRotina {
  * A fronteira já está no lugar certo (este componente busca, o client só
  * recebe), então a troca acontece aqui.
  */
-export default async function TreinoPage({ searchParams }: PageProps<"/treino">) {
+export default async function SessaoPage({ searchParams }: PageProps<"/sessao">) {
   const { rotina: rotinaId } = await searchParams;
   const supabase = await createClient();
 

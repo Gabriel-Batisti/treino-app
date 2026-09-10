@@ -36,7 +36,7 @@ export default async function Home() {
   return (
     <main className="flex-1 flex flex-col pt-safe pb-safe">
       <header className="px-4 pt-6 pb-4">
-        <h1 className="text-3xl font-semibold tracking-tight">Treino</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Treino</h1>
         <p className="mt-0.5 text-sm text-muted">
           {rotinas?.length ?? 0} {rotinas?.length === 1 ? "rotina" : "rotinas"}
         </p>
@@ -68,7 +68,7 @@ export default async function Home() {
               </Link>
 
               <Link
-                href={`/treino?rotina=${r.id}`}
+                href={`/sessao?rotina=${r.id}`}
                 className="mt-3 block rounded-xl bg-accent text-black font-semibold py-3.5 text-center text-sm"
               >
                 Começar rotina
@@ -78,11 +78,6 @@ export default async function Home() {
         })}
       </section>
 
-      <div className="mt-auto px-4 pt-6 flex flex-col gap-1">
-        <Link href="/exercicios" className="py-3 text-center text-sm text-muted">
-          Exercícios
-        </Link>
-      </div>
     </main>
   );
 }
