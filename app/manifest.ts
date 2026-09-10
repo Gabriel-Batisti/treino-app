@@ -10,6 +10,12 @@ export default function manifest(): MetadataRoute.Manifest {
     background_color: "#0a0a0b",
     theme_color: "#0a0a0b",
     orientation: "portrait",
-    icons: [],
+    icons: [
+      { src: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { src: "/icon-512.png", sizes: "512x512", type: "image/png" },
+      // "maskable" é o que o Android recorta em círculo; o desenho encolhe
+      // pra caber na safe zone. Ver scripts/gerar-icones.py.
+      { src: "/icon-512-maskable.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+    ],
   };
 }
