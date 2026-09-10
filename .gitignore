@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Dados exportados — não versionar (crescem sem limite e é dado pessoal).
+# Durabilidade offsite = copiar a pasta pro OneDrive, não commitar.
+backups/
