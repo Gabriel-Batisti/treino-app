@@ -1,48 +1,42 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
 import { ListaRotinas, type RotinaDaLista } from "./lista-rotinas";
+import { lerRotinas } from "@/lib/local/db";
 
-export const dynamic = "force-dynamic";
+/**
+ * Lê do IndexedDB, não do servidor (D-007).
+ *
+ * É por isso que esta página é Client Component: assim o HTML é estático, o
+ * service worker consegue guardá-la, e ela ABRE sem rede — que é o caminho da
+ * academia. Quem enche o banco local é o Sincronizador, em segundo plano.
+ *
+ * Timeline, perfil e gráficos seguem no servidor de propósito: cada tela que
+ * lê do local é mais uma coisa a manter sincronizada.
+ */
+export default function Rotinas() {
+  const [rotinas, setRotinas] = useState<RotinaDaLista[] | null>(null);
 
-interface ItemRotina {
-  ordem: number;
-  exercicios: { nome: string } | null;
-}
-
-export default async function Rotinas() {
-  const supabase = await createClient();
-
-  const [{ data: rotinas }, { data: ultimas }] = await Promise.all([
-    supabase
-      .from("rotinas")
-      // Traz as arquivadas também: a lista tem "mostrar ocultas".
-      .select("id, nome, ordem, arquivada, rotina_exercicios(ordem, exercicios(nome))")
-      .order("ordem"),
-    supabase
-      .from("sessoes")
-      .select("nome, data_local")
-      .eq("status", "concluida")
-      .order("inicio_em", { ascending: false })
-      .limit(60),
-  ]);
-
-  // Última vez que cada treino foi feito — casa por NOME, que é o que liga
-  // rotina e histórico enquanto `sessoes.rotina_id` não é preenchido.
-  const ultimaVez = new Map<string, string>();
-  for (const s of ultimas ?? []) {
-    if (s.nome && !ultimaVez.has(s.nome)) ultimaVez.set(s.nome, s.data_local);
-  }
-
-  const lista: RotinaDaLista[] = (rotinas ?? []).map((r) => ({
-    id: r.id,
-    nome: r.nome,
-    arquivada: r.arquivada,
-    ultimaVez: r.nome ? (ultimaVez.get(r.nome) ?? null) : null,
-    exercicios: ((r.rotina_exercicios ?? []) as unknown as ItemRotina[])
-      .sort((a, b) => a.ordem - b.ordem)
-      .map((i) => i.exercicios?.nome)
-      .filter(Boolean) as string[],
-  }));
+  useEffect(() => {
+    let vivo = true;
+    (async () => {
+      const locais = await lerRotinas();
+      if (!vivo) return;
+      setRotinas(
+        locais.map((r) => ({
+          id: r.id,
+          nome: r.nome,
+          arquivada: r.arquivada,
+          ultimaVez: r.ultimaVez,
+          exercicios: r.exercicios.map((e) => e.nome),
+        })),
+      );
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, []);
 
   return (
     <main className="flex-1 flex flex-col pt-safe px-4">
@@ -60,7 +54,17 @@ export default async function Rotinas() {
 
       <h2 className="mt-6 text-lg font-medium">Rotinas</h2>
 
-      <ListaRotinas rotinas={lista} />
+      {rotinas === null ? (
+        <p className="py-10 text-center text-sm text-muted">carregando…</p>
+      ) : rotinas.length === 0 ? (
+        <p className="py-10 text-center text-sm text-muted">
+          Nenhuma rotina no aparelho ainda.
+          <br />
+          Abra o app com internet uma vez pra baixar.
+        </p>
+      ) : (
+        <ListaRotinas rotinas={rotinas} />
+      )}
 
       <div className="h-6" />
     </main>

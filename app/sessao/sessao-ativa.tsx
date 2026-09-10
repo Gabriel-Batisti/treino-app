@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { salvarSessao } from "@/app/actions/treino";
+import { enfileirar } from "@/lib/local/db";
+import { sincronizar } from "@/lib/local/sync";
 import { hojeLocal, formatPeso, haQuantoTempo } from "@/lib/format";
 import { e1rm, volume } from "@/lib/treino/calc";
 
@@ -198,11 +199,17 @@ export function SessaoAtiva({
     });
   }
 
+  /**
+   * Grava NO APARELHO e só então tenta subir. Nunca falha por falta de rede:
+   * o treino é o dado irreversível, e o requisito é a academia sem sinal
+   * (D-007). O upload vira problema do Sincronizador.
+   */
   async function finalizar() {
     setSalvando(true);
     setErro(null);
-    const r = await salvarSessao({
-      id: crypto.randomUUID(),
+    const sessaoId = crypto.randomUUID();
+    const payload = {
+      id: sessaoId,
       nome: nomeRotina,
       inicio_em: inicioRef.current,
       fim_em: new Date().toISOString(),
@@ -226,12 +233,11 @@ export function SessaoAtiva({
           registrada_em: s.registradaEm ?? new Date().toISOString(),
         })),
       })),
-    });
-    if (!r.ok) {
-      setErro(r.error);
-      setSalvando(false);
-      return;
-    }
+    };
+
+    await enfileirar({ id: sessaoId, tipo: "sessao", payload });
+    // Dispara sem esperar: se não houver rede, fica na fila e sobe depois.
+    void sincronizar();
     router.push("/");
     router.refresh();
   }

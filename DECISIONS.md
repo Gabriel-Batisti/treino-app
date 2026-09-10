@@ -64,6 +64,15 @@ SW **escrito à mão** em `public/sw.js`, não `next-pwa`/Serwist: o `AGENTS.md`
 
 **Sinergia:** como a tela de sessão já é client-side (D-008), o SW só precisa servir shell estático + bundle. Se fosse Server Component, cachear payload RSC seria o pesadelo.
 
+### Executado em 10/09/2026 — quatro armadilhas que só apareceram rodando
+
+1. **`install` roda uma vez só.** Se o cache for apagado depois — e o Safari apaga storage — o worker segue "activated" e o precache NUNCA é refeito: o app falha offline em silêncio. Por isso quem garante o cache é a PÁGINA, a cada abertura (`components/registrar-sw.tsx`), não o `install`.
+2. **`cache.add` em paralelo falha.** As quatro telas via `Promise.allSettled` gravavam só a primeira. Serializado.
+3. **O chunk de uma rota não vira `<script>` no DOM** — vem por import dinâmico. Varrer o DOM não o acha e `router.prefetch` não o baixa; abrir `/sessao` offline sem nunca ter aberto online travava em "carregando…". Resolvido carregando cada rota uma vez num iframe escondido.
+4. **O iframe de aquecimento carrega a página, que roda o registrador, que cria mais iframes.** Explosão exponencial. Guard `window.top !== window.self`.
+
+**Verificado ponta a ponta:** servidor derrubado → app abre → `/sessao` mostra o "anterior" do IndexedDB → 3 séries marcadas e concluídas → fila local com o treino → servidor de volta → subiu sozinho → chegou no Postgres com os valores certos.
+
 ---
 
 ## D-007 — Leitura local-first, escrita autoritativa no servidor

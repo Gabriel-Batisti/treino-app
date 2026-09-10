@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { salvarCardio } from "@/app/actions/cardio";
+import { enfileirar } from "@/lib/local/db";
+import { sincronizar } from "@/lib/local/sync";
 import { hojeLocal } from "@/lib/format";
 
 /**
@@ -126,8 +127,10 @@ export function FormCardio() {
     setSalvando(true);
     setErro(null);
     const duracao = inicio != null ? Math.max(1, Math.ceil(decorridoSeg / 60)) : minutos;
-    const r = await salvarCardio({
-      id: crypto.randomUUID(),
+    const cardioId = crypto.randomUUID();
+    // Mesma regra do treino: grava no aparelho, sobe depois (D-007).
+    const payload = {
+      id: cardioId,
       tipo,
       // Se o cronômetro rodou, o início é o de verdade.
       inicio_em: new Date(inicio ?? Date.now()).toISOString(),
@@ -137,12 +140,9 @@ export function FormCardio() {
       distancia_km: numero(distancia),
       intensidade,
       notas: null,
-    });
-    if (!r.ok) {
-      setErro(r.error);
-      setSalvando(false);
-      return;
-    }
+    };
+    await enfileirar({ id: cardioId, tipo: "cardio", payload });
+    void sincronizar();
     try {
       localStorage.removeItem(CHAVE);
     } catch {
