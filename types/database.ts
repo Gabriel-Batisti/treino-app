@@ -29,6 +29,57 @@ export type Database = {
   }
   public: {
     Tables: {
+      cardios: {
+        Row: {
+          atualizado_em: string
+          calorias: number | null
+          criado_em: string
+          data_local: string
+          distancia_km: number | null
+          duracao_min: number
+          excluido_em: string | null
+          id: string
+          inicio_em: string
+          intensidade: string | null
+          kcal_por_min: number | null
+          notas: string | null
+          tipo: string
+          user_id: string
+        }
+        Insert: {
+          atualizado_em?: string
+          calorias?: number | null
+          criado_em?: string
+          data_local: string
+          distancia_km?: number | null
+          duracao_min: number
+          excluido_em?: string | null
+          id: string
+          inicio_em: string
+          intensidade?: string | null
+          kcal_por_min?: number | null
+          notas?: string | null
+          tipo: string
+          user_id?: string
+        }
+        Update: {
+          atualizado_em?: string
+          calorias?: number | null
+          criado_em?: string
+          data_local?: string
+          distancia_km?: number | null
+          duracao_min?: number
+          excluido_em?: string | null
+          id?: string
+          inicio_em?: string
+          intensidade?: string | null
+          kcal_por_min?: number | null
+          notas?: string | null
+          tipo?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       exercicios: {
         Row: {
           arquivado: boolean
@@ -381,6 +432,25 @@ export type Database = {
       }
     }
     Views: {
+      vw_recorde_exercicio: {
+        Row: {
+          exercicio_id: string | null
+          melhor_e1rm: number | null
+          melhor_peso: number | null
+          melhor_volume_serie: number | null
+          total_series: number | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sessao_exercicios_exercicio_id_fkey"
+            columns: ["exercicio_id"]
+            isOneToOne: false
+            referencedRelation: "exercicios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vw_ultimo_desempenho: {
         Row: {
           atualizado_em: string | null
@@ -562,11 +632,17 @@ export type SessaoInsert = Omit<Tabelas["sessoes"]["Insert"], "duracao_seg">;
 export type SessaoExercicio = Tabelas["sessao_exercicios"]["Row"];
 export type SessaoExercicioInsert = Tabelas["sessao_exercicios"]["Insert"];
 export type Serie = Tabelas["series"]["Row"];
+export type Cardio = Tabelas["cardios"]["Row"];
+/** Sem `kcal_por_min`: é coluna gerada (D-003). */
+export type CardioInsert = Omit<Tabelas["cardios"]["Insert"], "kcal_por_min">;
 /** Sem `volume_kg` nem `e1rm`: são colunas geradas (D-003). */
 export type SerieInsert = Omit<Tabelas["series"]["Insert"], "volume_kg" | "e1rm">;
 
 /** Uma linha da view do "anterior" (D-005). */
 export type UltimoDesempenho = Views["vw_ultimo_desempenho"]["Row"];
+
+/** Melhor marca por exercício — alimenta a contagem de recordes na timeline. */
+export type RecordeExercicio = Views["vw_recorde_exercicio"]["Row"];
 
 export type ModoMedicao = "peso_reps" | "peso_corporal_reps" | "tempo" | "distancia";
 export type TipoSerie = "normal" | "aquecimento" | "drop" | "falha" | "backoff";
