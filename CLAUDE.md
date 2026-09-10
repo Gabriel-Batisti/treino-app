@@ -17,6 +17,22 @@ Projeto irmão, usado como **referência de padrão** (nunca de domínio): `C:\d
 - **IndexedDB** (`idb`) como caminho de leitura offline + **service worker escrito à mão**
 - Deploy **Vercel Hobby**, auto-deploy do `main`
 
+## Comandos
+
+```bash
+pnpm dev              # dev server (Turbopack), localhost:3000
+pnpm build            # build de produção
+pnpm typecheck        # npx tsc --noEmit
+```
+
+**`tsc --noEmit` falha em repo limpo, antes do primeiro build.** O Next 16 *gera* `LayoutProps`/`PageProps` em `.next/types`; sem eles, `app/layout.tsx` acusa `TS2304: Cannot find name 'LayoutProps'`. Rode `pnpm build` uma vez depois de clonar. Não "conserte" o layout tipando à mão.
+
+**Windows + pnpm:** o `pnpm.exe` veio do winget e o PATH do shell pode não enxergar. Em comando direto, prepende:
+
+```bash
+export PATH="/c/Users/gabri/AppData/Local/Microsoft/WinGet/Packages/pnpm.pnpm_Microsoft.Winget.Source_8wekyb3d8bbwe:$PATH"
+```
+
 ## As cinco regras que definem este projeto
 
 Se você só ler cinco linhas deste arquivo, que sejam estas.
