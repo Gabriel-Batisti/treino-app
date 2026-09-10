@@ -1,26 +1,72 @@
 @import "tailwindcss";
 
+/*
+ * Mobile-first de verdade: uma mão, polegar, celular escorregando, 40s entre
+ * séries. Ver a seção "Mobile-first" do CLAUDE.md.
+ */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0a0a0b;
+  --foreground: #f4f4f5;
+  --muted: #71717a;
+  --card: #18181b;
+  --border: #27272a;
+  --accent: #22d3ee;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-card: var(--card);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
   --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  /* iOS aumenta a fonte sozinho ao rotacionar sem isto. */
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  /* Mata o zoom do double-tap: entre séries você toca rápido e repetido. */
+  touch-action: manipulation;
+  overscroll-behavior-y: none;
+}
+
+/*
+ * O iOS dá zoom ao focar input com fonte < 16px. Não é preferência, é
+ * comportamento do Safari — e o zoom desalinha a tela inteira no meio da série.
+ */
+input,
+select,
+textarea {
+  font-size: 16px;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/*
+ * Safe area. Isto SÓ funciona junto com viewportFit: "cover" +
+ * statusBarStyle: "black-translucent" no layout — as duas coisas andam
+ * juntas. O leilões-app tentou só metade e teve que reverter (commit 9c7c729):
+ * o header foi parar embaixo da Dynamic Island.
+ */
+.pb-safe {
+  padding-bottom: max(env(safe-area-inset-bottom), 0.5rem);
+}
+.pt-safe {
+  padding-top: max(env(safe-area-inset-top), 0.5rem);
 }
