@@ -75,8 +75,8 @@ export default async function ExercicioPage({ params }: PageProps<"/exercicios/[
 
   return (
     <main className="flex-1 flex flex-col pb-safe">
-      <header className="pt-safe px-4 pt-4 pb-3 flex items-center gap-3 border-b border-border">
-        <Link href="/" aria-label="voltar" className="size-9 -ml-1 grid place-items-center text-muted text-xl">
+      <header className="pt-safe sticky top-0 z-30 bg-background/95 backdrop-blur px-4 pt-3 pb-3 flex items-center gap-2 border-b border-border">
+        <Link href="/" aria-label="voltar" className="size-9 -ml-2 grid place-items-center text-muted text-2xl leading-none">
           ‹
         </Link>
         <span className="text-sm truncate">{exercicio.nome}</span>
