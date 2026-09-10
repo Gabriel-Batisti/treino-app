@@ -231,7 +231,7 @@ O passo 3 depende do arquivo do usuário; se atrasar, 4 roda antes (a importaç�
 ## 8. Riscos
 
 **1. São dois apps, não um.** Heavy e MyFitnessPal são produtos separados com anos de polimento. Construir os dois em paralelo entrega os dois pela metade — e um app de dieta pela metade contamina a metade de treino que estava boa.
-→ *Mitigação:* schema inteiro (barato), UI faseada. **Treino → 3 semanas de uso → dieta. Sem exceção.**
+→ *Mitigação:* **Treino → 3 semanas de uso → dieta. Sem exceção.** Modele o treino por inteiro (não pela metade), mas **`0001` não traz tabela de dieta**: tabela morta gera tipo morto, e o schema da dieta só melhora com 3 semanas de uso real do treino. Dieta é a `0002`.
 
 **2. Atrito de registro — o maior, e é de produto.** O que faz o MFP funcionar não é o banco; é histórico, favoritos, porções nomeadas e "repetir ontem". Se logar o almoço der 12 toques, você para. O modo de falhar é gastar as primeiras semanas em importação de dados e nascer com busca ruim.
 → *Mitigação:* TACO seed + 30 alimentos fixados à mão + "repetir refeição de ontem" **antes** de qualquer scraper. No treino: se "repetir a série anterior" não for um toque, o app perdeu pro papel.
