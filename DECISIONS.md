@@ -157,6 +157,14 @@ Seed do **`yuhonas/free-exercise-db`** (~870 exercícios, **Unlicense** = domín
 
 **Plano B se o arquivo demorar:** `exercicios.fixado` + `ordem_manual` cobre o dia 1 na mão.
 
+### Executado em 10/09/2026 — e o risco veio de onde eu não esperava
+
+O export trouxe 1258 séries / 82 sessões / 03/06/2025 → 10/09/2026. O risco previsto era seed × import; o real era **dentro do próprio arquivo**: o usuário trocou o idioma do Heavy por volta de maio/2026, e o mesmo exercício aparece com **dois nomes** (`Chest Fly (Machine)` e `Crucifixo (Máquina)`). 69 nomes → **48 exercícios**, com 21 junções.
+
+O que decidiu cada junção duvidosa não foi tradução, foi **carga mediana + treino em que aparece + período**: `Triceps Pushdown` (30 kg) é o `Tríceps na Polia` (32,5), mas `Triceps Rope Pushdown` (22,5) é outro movimento — e os dois **conviviam no mesmo Treino B**, o que prova que eram exercícios distintos. Mapa e justificativas em [`scripts/heavy/aliases.ts`](scripts/heavy/aliases.ts), inclusive a lista `NAO_JUNTAR` do que foi deixado separado de propósito.
+
+**Regra que sai disso:** na dúvida, não junte. Como o "anterior" (D-005) usa a sessão **mais recente**, uma junção faltando estraga gráfico de longo prazo, não o número que aparece na academia. Juntar depois é uma linha no mapa + reimportar (idempotente por id determinístico); separar depois dá muito mais trabalho.
+
 ---
 
 ## D-015 — `series.rpe`, não `series.rir`
