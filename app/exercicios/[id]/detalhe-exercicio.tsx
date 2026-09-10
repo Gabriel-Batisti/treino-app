@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { formatData, formatDataCurta, formatPeso } from "@/lib/format";
+import type { Ilustracao } from "@/lib/treino/ilustracoes";
 
 export interface SerieDoExercicio {
   peso: number | null;
@@ -45,9 +46,11 @@ function serie(sessoes: SessaoDoExercicio[], metrica: Metrica) {
 export function DetalheExercicio({
   sessoes,
   notasExercicio,
+  ilustracao,
 }: {
   sessoes: SessaoDoExercicio[];
   notasExercicio: string | null;
+  ilustracao: Ilustracao | null;
 }) {
   const [aba, setAba] = useState<Aba>("resumo");
   const [metrica, setMetrica] = useState<Metrica>("peso");
@@ -169,18 +172,38 @@ export function DetalheExercicio({
 
       {aba === "instrucoes" && (
         <section className="px-4 pt-4">
-          {notasExercicio ? (
-            <p className="text-sm whitespace-pre-wrap">{notasExercicio}</p>
-          ) : (
-            <div className="py-8 text-center">
-              <p className="text-sm text-muted">Sem instruções ainda.</p>
-              {/* Ilustração do movimento: só existe base aberta com FOTO
-                  estática (free-exercise-db, domínio público). Animação como a
-                  do Hevy é proprietária. Decisão pendente com o usuário. */}
-              <p className="mt-1 text-xs text-muted/70">
-                Ilustração do movimento ainda não implementada.
+          {notasExercicio && (
+            <p className="text-sm whitespace-pre-wrap mb-5">{notasExercicio}</p>
+          )}
+
+          {ilustracao ? (
+            <>
+              {ilustracao.aprox && (
+                <p className="mb-3 rounded-lg bg-card border border-border px-3 py-2 text-[11px] text-muted">
+                  Ilustração aproximada — o movimento é o mesmo, o aparelho é outro
+                  ({ilustracao.fonte}).
+                </p>
+              )}
+              <ol className="flex flex-col gap-2.5">
+                {ilustracao.instrucoes.map((passo, i) => (
+                  <li key={i} className="flex gap-3 text-sm">
+                    <span className="text-muted tabular-nums shrink-0">{i + 1}</span>
+                    <span className="text-foreground/90">{passo}</span>
+                  </li>
+                ))}
+              </ol>
+              {/* As instruções vêm da free-exercise-db, em inglês e sem tradução.
+                  Dizer de onde vieram evita parecer texto do app. */}
+              <p className="mt-5 text-[11px] text-muted/70">
+                Instruções e fotos: free-exercise-db (domínio público), em inglês.
               </p>
-            </div>
+            </>
+          ) : (
+            !notasExercicio && (
+              <p className="text-sm text-muted py-8 text-center">
+                Sem instruções para este exercício.
+              </p>
+            )
           )}
         </section>
       )}

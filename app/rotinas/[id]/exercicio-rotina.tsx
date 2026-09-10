@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { atualizarDescanso } from "@/app/actions/rotinas";
 import { formatPeso } from "@/lib/format";
+import { Ilustracao } from "@/components/ilustracao";
 
 /**
  * Um exercício dentro do detalhe da rotina — tabela de séries + descanso
@@ -24,7 +25,7 @@ export interface ExercicioRotinaProps {
   rotinaExercicioId: string;
   exercicioId: string;
   nome: string;
-  equipamento: string | null;
+  nomeBusca: string;
   seriesAlvo: number;
   repsAlvoMin: number | null;
   repsAlvoMax: number | null;
@@ -68,10 +69,7 @@ export function ExercicioRotina(props: ExercicioRotinaProps) {
   return (
     <section>
       <Link href={`/exercicios/${props.exercicioId}`} className="flex items-center gap-3">
-        {/* Espaço da ilustração do movimento — ainda sem imagem. */}
-        <span className="size-11 shrink-0 rounded-full bg-border grid place-items-center text-[10px] text-muted">
-          {props.equipamento?.slice(0, 3) ?? "—"}
-        </span>
+        <Ilustracao nomeBusca={props.nomeBusca} className="size-12" />
         <span className="text-accent font-medium leading-tight">{props.nome}</span>
       </Link>
 

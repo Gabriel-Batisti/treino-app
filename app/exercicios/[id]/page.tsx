@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { formatData, formatPeso } from "@/lib/format";
 import { DetalheExercicio, type SessaoDoExercicio } from "./detalhe-exercicio";
+import { Ilustracao } from "@/components/ilustracao";
+import { ilustracaoDe } from "@/lib/treino/ilustracoes";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +23,7 @@ export default async function ExercicioPage({ params }: PageProps<"/exercicios/[
 
   const { data: exercicio } = await supabase
     .from("exercicios")
-    .select("id, nome, grupo_muscular, equipamento, modo_medicao, usos, notas")
+    .select("id, nome, nome_busca, grupo_muscular, equipamento, modo_medicao, usos, notas")
     .eq("id", id)
     .maybeSingle();
 
@@ -83,12 +85,18 @@ export default async function ExercicioPage({ params }: PageProps<"/exercicios/[
       </header>
 
       <div className="px-4 pt-4">
-        <h1 className="text-2xl font-semibold tracking-tight">{exercicio.nome}</h1>
-        <p className="mt-1 text-xs text-muted">
-          {[exercicio.grupo_muscular, exercicio.equipamento].filter(Boolean).join(" · ") || "sem classificação"}
-          {" · "}
-          {exercicio.usos} séries
-        </p>
+        <div className="flex items-center gap-4">
+          <Ilustracao nomeBusca={exercicio.nome_busca} className="size-24 rounded-2xl" />
+          <div className="min-w-0">
+            <h1 className="text-xl font-semibold tracking-tight leading-tight">{exercicio.nome}</h1>
+            <p className="mt-1 text-xs text-muted">
+              {[exercicio.grupo_muscular, exercicio.equipamento].filter(Boolean).join(" · ") ||
+                "sem classificação"}
+              {" · "}
+              {exercicio.usos} séries
+            </p>
+          </div>
+        </div>
 
         <div className="mt-4 grid grid-cols-3 gap-3">
           {[
@@ -105,7 +113,11 @@ export default async function ExercicioPage({ params }: PageProps<"/exercicios/[
         </div>
       </div>
 
-      <DetalheExercicio sessoes={sessoes} notasExercicio={exercicio.notas} />
+      <DetalheExercicio
+        sessoes={sessoes}
+        notasExercicio={exercicio.notas}
+        ilustracao={ilustracaoDe(exercicio.nome_busca)}
+      />
     </main>
   );
 }

@@ -88,6 +88,15 @@ Pra ter barra inferior colada na base é preciso, **no mesmo commit**:
 - **O gate de auth não fica na frente do shell offline.** Falha de refresh bloqueia **sync**, nunca **uso**: a tela de treino renderiza do IndexedDB e mostra "offline, sincroniza depois". Middleware **não** redireciona a rota de sessão pra `/login`.
 - **Pegadinha do iOS:** o PWA instalado tem storage próprio, separado do Safari. Instalar **primeiro**, logar **dentro** do app instalado.
 
+## Ilustrações dos exercícios
+
+`lib/treino/ilustracoes.ts` é **gerado** por `scripts/baixar-ilustracoes.py` — pra mudar, edite o `MAPA` do script e rode de novo. Fonte: [`yuhonas/free-exercise-db`](https://github.com/yuhonas/free-exercise-db), licença Unlicense (domínio público).
+
+- **Duas fotos por exercício** (início e fim do movimento), alternadas em CSS puro. Não é gif: animação de verdade só existe em base proprietária.
+- O mapa mora em **código, não no banco** — é estático, dispensa migration, e o service worker vai cachear os arquivos junto com o resto do app.
+- `aprox: true` = mesmo movimento, aparelho diferente. **A UI avisa.** Melhor foto aproximada e rotulada do que nenhuma, e muito melhor que foto errada sem aviso.
+- As instruções vêm da base **em inglês, sem tradução**, e a tela diz de onde vieram.
+
 ## Saída dos dados
 
 `scripts/export.ts` (via `tsx`, service role) → `backups/AAAA-MM-DD/` com **JSONL por tabela** (fiel, reimportável) + **CSV** (legível em planilha).

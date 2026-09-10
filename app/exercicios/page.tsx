@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { haQuantoTempo, formatPeso } from "@/lib/format";
+import { haQuantoTempo } from "@/lib/format";
+import { Ilustracao } from "@/components/ilustracao";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +12,7 @@ export default async function ExerciciosPage() {
   // histórico importado que faz isso funcionar já no dia 1.
   const { data: exercicios } = await supabase
     .from("exercicios")
-    .select("id, nome, equipamento, usos, ultimo_uso_em")
+    .select("id, nome, nome_busca, equipamento, usos, ultimo_uso_em")
     .eq("arquivado", false)
     .order("fixado", { ascending: false })
     .order("ultimo_uso_em", { ascending: false, nullsFirst: false })
@@ -27,8 +28,9 @@ export default async function ExerciciosPage() {
       <ul className="flex flex-col divide-y divide-border">
         {(exercicios ?? []).map((e) => (
           <li key={e.id}>
-            <Link href={`/exercicios/${e.id}`} className="py-3 flex items-baseline justify-between gap-3">
-            <div className="min-w-0">
+            <Link href={`/exercicios/${e.id}`} className="py-3 flex items-center justify-between gap-3">
+            <Ilustracao nomeBusca={e.nome_busca} className="size-10" />
+            <div className="min-w-0 flex-1">
               <p className="truncate">{e.nome}</p>
               <p className="text-[11px] text-muted">
                 {e.equipamento ?? "—"} · {e.usos} séries

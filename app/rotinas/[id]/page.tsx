@@ -15,7 +15,7 @@ interface ItemRotina {
   reps_alvo_min: number | null;
   reps_alvo_max: number | null;
   descanso_seg: number | null;
-  exercicios: { id: string; nome: string; equipamento: string | null } | null;
+  exercicios: { id: string; nome: string; nome_busca: string; equipamento: string | null } | null;
 }
 
 export default async function RotinaPage({ params }: PageProps<"/rotinas/[id]">) {
@@ -25,7 +25,7 @@ export default async function RotinaPage({ params }: PageProps<"/rotinas/[id]">)
   const { data: rotina } = await supabase
     .from("rotinas")
     .select(
-      "id, nome, notas, rotina_exercicios(id, ordem, series_alvo, reps_alvo_min, reps_alvo_max, descanso_seg, exercicios(id, nome, equipamento))",
+      "id, nome, notas, rotina_exercicios(id, ordem, series_alvo, reps_alvo_min, reps_alvo_max, descanso_seg, exercicios(id, nome, nome_busca, equipamento))",
     )
     .eq("id", id)
     .maybeSingle();
@@ -131,7 +131,7 @@ export default async function RotinaPage({ params }: PageProps<"/rotinas/[id]">)
                 rotinaExercicioId={i.id}
                 exercicioId={ex.id}
                 nome={ex.nome}
-                equipamento={ex.equipamento}
+                nomeBusca={ex.nome_busca}
                 seriesAlvo={qtd}
                 repsAlvoMin={i.reps_alvo_min}
                 repsAlvoMax={i.reps_alvo_max}

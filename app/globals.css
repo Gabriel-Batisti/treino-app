@@ -70,3 +70,20 @@ input[type="number"]::-webkit-inner-spin-button {
 .pt-safe {
   padding-top: max(env(safe-area-inset-top), 0.5rem);
 }
+
+/*
+ * Ilustração do exercício: dois quadros em corte seco, como um gif de 2 frames.
+ * `steps(1, end)` é o que faz o corte ser seco em vez de fade — fade daria
+ * aparência de transição, e o que se quer é ver as duas posições.
+ */
+@keyframes ilustracao-alterna {
+  0%, 48% { opacity: 0; }
+  50%, 98% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.ilustracao-fim {
+  animation: ilustracao-alterna 1.8s steps(1, end) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ilustracao-fim { animation: none; opacity: 0; }
+}
