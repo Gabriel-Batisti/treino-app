@@ -50,7 +50,7 @@ export default async function Perfil() {
           <span>Exercícios</span>
           <span className="text-muted">›</span>
         </Link>
-        <Link href="/cardio/novo" className="px-4 py-4 flex items-center justify-between">
+        <Link href="/cardio" className="px-4 py-4 flex items-center justify-between">
           <span>Registrar cardio</span>
           <span className="text-muted">›</span>
         </Link>

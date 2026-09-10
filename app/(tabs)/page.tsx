@@ -90,7 +90,7 @@ export default async function Inicio() {
       <header className="px-4 pt-6 pb-4 flex items-center justify-between">
         <h1 className="text-2xl font-semibold tracking-tight">Início</h1>
         <Link
-          href="/cardio/novo"
+          href="/cardio"
           className="rounded-full border border-border px-4 py-2 text-xs text-accent"
         >
           + Cardio

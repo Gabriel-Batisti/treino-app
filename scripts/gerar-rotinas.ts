@@ -26,9 +26,14 @@ import { createHash } from "node:crypto";
 config({ path: ".env.local", quiet: true });
 
 const DESCANSO_PADRAO_SEG = 120;
-const SESSOES_RECENTES = 40;
-/** Treino que não aparece há mais de 45 dias não vira rotina (Treino A-E). */
-const DIAS_PARA_ESQUECER = 45;
+const SESSOES_RECENTES = 120;
+/**
+ * Antes era 45 dias, o que descartava os Treinos A-E. Passou a 400 porque a
+ * tela agora AGRUPA em vez de esconder: as de letra viram "Muscle lab", as de
+ * número "Minhas rotinas". Ocultar é decisão do usuário (rotinas.arquivada),
+ * não do script.
+ */
+const DIAS_PARA_ESQUECER = 400;
 /** Faixa de reps nunca menor que isto: "9-9" não é alvo, é número. */
 const BANDA_MINIMA = 4;
 /** Abaixo disto o percentil vira min/max e uma série falha define o piso. */
