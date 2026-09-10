@@ -26,7 +26,8 @@ export default async function ExerciciosPage() {
 
       <ul className="flex flex-col divide-y divide-border">
         {(exercicios ?? []).map((e) => (
-          <li key={e.id} className="py-3 flex items-baseline justify-between gap-3">
+          <li key={e.id}>
+            <Link href={`/exercicios/${e.id}`} className="py-3 flex items-baseline justify-between gap-3">
             <div className="min-w-0">
               <p className="truncate">{e.nome}</p>
               <p className="text-[11px] text-muted">
@@ -36,6 +37,7 @@ export default async function ExerciciosPage() {
             <span className="text-[11px] text-muted shrink-0">
               {e.ultimo_uso_em ? haQuantoTempo(e.ultimo_uso_em.slice(0, 10)) : "nunca"}
             </span>
+            </Link>
           </li>
         ))}
       </ul>

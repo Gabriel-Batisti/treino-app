@@ -11,7 +11,8 @@
     "export": "tsx scripts/export.ts",
     "check-env": "tsx scripts/check-env.ts",
     "restore": "tsx scripts/restore.ts",
-    "importar-heavy": "tsx scripts/importar-heavy.ts"
+    "importar-heavy": "tsx scripts/importar-heavy.ts",
+    "gerar-rotinas": "tsx scripts/gerar-rotinas.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

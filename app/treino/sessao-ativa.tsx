@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { salvarSessao } from "@/app/actions/treino";
 import { hojeLocal, formatPeso, haQuantoTempo } from "@/lib/format";
-import { e1rm } from "@/lib/treino/calc";
+import { e1rm, volume } from "@/lib/treino/calc";
 
 /**
  * A TELA DE SESSÃO ATIVA — inverte o default do projeto de propósito (D-008).
@@ -27,6 +27,10 @@ export interface ExercicioDaSessao {
   exercicioId: string;
   nome: string;
   modoMedicao: string;
+  seriesAlvo: number;
+  repsAlvoMin: number | null;
+  repsAlvoMax: number | null;
+  descansoSeg: number | null;
   anterior: SerieAnterior[];
   anteriorEm: string | null;
 }
@@ -42,34 +46,56 @@ interface SerieEmAndamento {
 
 interface ExercicioEmAndamento extends ExercicioDaSessao {
   id: string;
+  notas: string;
   series: SerieEmAndamento[];
 }
 
 function novaSerie(indice: number): SerieEmAndamento {
-  return { id: crypto.randomUUID(), indice, pesoKg: null, reps: null, concluida: false, registradaEm: null };
+  return {
+    id: crypto.randomUUID(),
+    indice,
+    pesoKg: null,
+    reps: null,
+    concluida: false,
+    registradaEm: null,
+  };
 }
 
-/** Monta as linhas a partir do "anterior": mesma quantidade de séries da última vez. */
+/** Quantidade de linhas = alvo da rotina, ou o que foi feito da última vez. */
 function montarExercicio(e: ExercicioDaSessao): ExercicioEmAndamento {
-  const qtd = Math.max(e.anterior.length, 1);
+  const qtd = Math.max(e.seriesAlvo, e.anterior.length, 1);
   return {
     ...e,
     id: crypto.randomUUID(),
+    notas: "",
     series: Array.from({ length: qtd }, (_, i) => {
       const s = novaSerie(i + 1);
       // Peso entra PREENCHIDO (raramente muda). Reps fica como placeholder —
       // preencher os dois faria você registrar série que não fez.
-      s.pesoKg = e.anterior[i]?.pesoKg ?? null;
+      s.pesoKg = e.anterior[i]?.pesoKg ?? e.anterior[e.anterior.length - 1]?.pesoKg ?? null;
       return s;
     }),
   };
 }
 
+function mmss(seg: number): string {
+  const m = Math.floor(Math.abs(seg) / 60);
+  const s = Math.abs(seg) % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+function formatDescanso(seg: number | null): string {
+  if (!seg) return "—";
+  const m = Math.floor(seg / 60);
+  const s = seg % 60;
+  return s ? `${m}min ${s}s` : `${m}min 0s`;
+}
+
 export function SessaoAtiva({
-  nomeModelo,
+  nomeRotina,
   exerciciosIniciais,
 }: {
-  nomeModelo: string | null;
+  nomeRotina: string | null;
   exerciciosIniciais: ExercicioDaSessao[];
 }) {
   const router = useRouter();
@@ -79,14 +105,15 @@ export function SessaoAtiva({
   );
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
-  const [decorrido, setDecorrido] = useState(0);
+  const [agora, setAgora] = useState(() => Date.now());
+  /** Timestamp em que o descanso acaba. Guardo o FIM, não o restante. */
+  const [descansoAte, setDescansoAte] = useState<number | null>(null);
 
   // Cronômetro por DIFERENÇA DE TIMESTAMP, não por contador incrementado: o
   // iOS congela timer com o app em background e um contador ficaria pra trás.
+  // Mesmo motivo pro descanso guardar o instante final.
   useEffect(() => {
-    const tick = () =>
-      setDecorrido(Math.floor((Date.now() - new Date(inicioRef.current).getTime()) / 1000));
-    tick();
+    const tick = () => setAgora(Date.now());
     const id = setInterval(tick, 1000);
     document.addEventListener("visibilitychange", tick);
     return () => {
@@ -95,20 +122,49 @@ export function SessaoAtiva({
     };
   }, []);
 
-  const mm = String(Math.floor(decorrido / 60)).padStart(2, "0");
-  const ss = String(decorrido % 60).padStart(2, "0");
-  const feitas = exercicios.reduce((n, e) => n + e.series.filter((s) => s.concluida).length, 0);
+  // Mantém a tela acesa durante o treino (iOS 16.4+). Falha em silêncio onde
+  // não existe — é conforto, não requisito.
+  useEffect(() => {
+    let lock: WakeLockSentinel | null = null;
+    const pedir = async () => {
+      try {
+        lock = await navigator.wakeLock?.request("screen");
+      } catch {
+        /* negado ou sem suporte */
+      }
+    };
+    pedir();
+    document.addEventListener("visibilitychange", pedir);
+    return () => {
+      document.removeEventListener("visibilitychange", pedir);
+      lock?.release().catch(() => {});
+    };
+  }, []);
 
-  function alterar(exIdx: number, sIdx: number, campo: "pesoKg" | "reps", valor: number | null) {
-    setExercicios((prev) => {
-      const cp = structuredClone(prev);
-      cp[exIdx].series[sIdx][campo] = valor;
-      return cp;
-    });
-  }
+  const decorrido = Math.floor((agora - new Date(inicioRef.current).getTime()) / 1000);
+  const restante = descansoAte ? Math.round((descansoAte - agora) / 1000) : null;
+
+  const feitas = exercicios.reduce((n, e) => n + e.series.filter((s) => s.concluida).length, 0);
+  const volumeTotal = exercicios.reduce(
+    (n, e) =>
+      n + e.series.filter((s) => s.concluida).reduce((v, s) => v + (volume(s.pesoKg, s.reps) ?? 0), 0),
+    0,
+  );
+
+  const alterar = useCallback(
+    (exIdx: number, sIdx: number, campo: "pesoKg" | "reps", valor: number | null) => {
+      setExercicios((prev) => {
+        const cp = structuredClone(prev);
+        cp[exIdx].series[sIdx][campo] = valor;
+        return cp;
+      });
+    },
+    [],
+  );
 
   /** ✓ com os campos vazios commita o anterior inteiro — o "fiz igual" num toque. */
   function concluir(exIdx: number, sIdx: number) {
+    let iniciarDescanso: number | null = null;
     setExercicios((prev) => {
       const cp = structuredClone(prev);
       const ex = cp[exIdx];
@@ -124,8 +180,11 @@ export function SessaoAtiva({
       if (s.reps == null) return cp; // sem reps não há série
       s.concluida = true;
       s.registradaEm = new Date().toISOString();
+      iniciarDescanso = ex.descansoSeg ?? null;
       return cp;
     });
+    if (iniciarDescanso) setDescansoAte(Date.now() + iniciarDescanso * 1000);
+    navigator.vibrate?.(30);
   }
 
   function addSerie(exIdx: number) {
@@ -144,7 +203,7 @@ export function SessaoAtiva({
     setErro(null);
     const r = await salvarSessao({
       id: crypto.randomUUID(),
-      nome: nomeModelo,
+      nome: nomeRotina,
       inicio_em: inicioRef.current,
       fim_em: new Date().toISOString(),
       data_local: hojeLocal(),
@@ -155,7 +214,7 @@ export function SessaoAtiva({
         ordem: i,
         nome_snapshot: e.nome,
         modo_medicao_snapshot: e.modoMedicao,
-        notas: null,
+        notas: e.notas.trim() || null,
         series: e.series.map((s) => ({
           id: s.id,
           indice: s.indice,
@@ -179,58 +238,121 @@ export function SessaoAtiva({
 
   return (
     <main className="flex-1 flex flex-col pb-safe">
-      <header className="pt-safe px-4 pt-6 pb-3 sticky top-0 bg-background/95 backdrop-blur z-10 border-b border-border">
-        <div className="flex items-baseline justify-between">
-          <h1 className="text-xl font-semibold">{nomeModelo ?? "Treino livre"}</h1>
-          <span className="tabular-nums text-sm text-muted">{mm}:{ss}</span>
+      <header className="pt-safe sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-border">
+        <div className="px-4 pt-4 flex items-center justify-between gap-3">
+          <h1 className="text-lg font-medium truncate">{nomeRotina ?? "Treino livre"}</h1>
+          <button
+            onClick={finalizar}
+            disabled={salvando || feitas === 0}
+            className="shrink-0 rounded-full bg-accent text-black font-semibold px-5 py-2 text-sm disabled:opacity-30"
+          >
+            {salvando ? "…" : "Concluir"}
+          </button>
         </div>
-        <p className="text-xs text-muted mt-0.5">
-          {feitas} {feitas === 1 ? "série feita" : "séries feitas"}
-        </p>
+
+        <div className="px-4 py-3 grid grid-cols-3 gap-2">
+          {[
+            ["Duração", mmss(decorrido)],
+            ["Volume", `${Math.round(volumeTotal).toLocaleString("pt-BR")} kg`],
+            ["Séries", String(feitas)],
+          ].map(([rotulo, valor]) => (
+            <div key={rotulo}>
+              <p className="text-[10px] uppercase tracking-wide text-muted">{rotulo}</p>
+              <p className="text-base tabular-nums">{valor}</p>
+            </div>
+          ))}
+        </div>
       </header>
 
-      <div className="flex-1 px-4 py-4 flex flex-col gap-6">
+      <div className="flex-1 px-4 py-4 flex flex-col gap-7">
         {exercicios.length === 0 && (
           <p className="text-sm text-muted py-12 text-center">
             Treino livre ainda não tem seletor de exercício.
-            <br />Volte e escolha um treino da lista.
+            <br />
+            Volte e escolha uma rotina.
           </p>
         )}
 
         {exercicios.map((ex, exIdx) => (
           <section key={ex.id}>
             <div className="flex items-baseline justify-between gap-2">
-              <h2 className="font-medium">{ex.nome}</h2>
+              <h2 className="font-medium text-accent">{ex.nome}</h2>
               {ex.anteriorEm && (
                 <span className="text-[11px] text-muted shrink-0">{haQuantoTempo(ex.anteriorEm)}</span>
               )}
             </div>
 
-            <div className="mt-2 flex flex-col gap-1.5">
+            <input
+              value={ex.notas}
+              placeholder="Adicione notas aqui…"
+              onChange={(e) =>
+                setExercicios((prev) => {
+                  const cp = structuredClone(prev);
+                  cp[exIdx].notas = e.target.value;
+                  return cp;
+                })
+              }
+              className="mt-1 w-full bg-transparent text-xs text-muted outline-none placeholder:text-muted/60"
+            />
+
+            <p className="mt-1 text-[11px] text-muted">
+              ⏱ Descanso: {formatDescanso(ex.descansoSeg)}
+            </p>
+
+            <div className="mt-2 grid grid-cols-[1.6rem_4.2rem_1fr_1fr_2.75rem] gap-2 text-[10px] uppercase tracking-wide text-muted">
+              <span className="text-center">Sér</span>
+              <span>Anterior</span>
+              <span className="text-center">Kg</span>
+              <span className="text-center">Reps</span>
+              <span />
+            </div>
+
+            <div className="mt-1 flex flex-col gap-1.5">
               {ex.series.map((s, sIdx) => {
                 const ant = ex.anterior[sIdx];
                 const est = e1rm(s.pesoKg, s.reps);
                 const bateu = ant?.e1rm != null && est != null && est > ant.e1rm;
                 return (
-                  <div key={s.id} className="flex items-center gap-2">
-                    <span className="w-5 text-center text-xs text-muted tabular-nums">{s.indice}</span>
+                  <div
+                    key={s.id}
+                    className="grid grid-cols-[1.6rem_4.2rem_1fr_1fr_2.75rem] gap-2 items-center"
+                  >
+                    <span className="text-center text-xs text-muted tabular-nums">{s.indice}</span>
 
-                    {/* O "anterior" em cinza — a informação mais importante da tela. */}
-                    <span className="w-20 text-[11px] text-muted tabular-nums shrink-0">
-                      {ant ? `${formatPeso(ant.pesoKg)}×${ant.reps}` : "—"}
+                    {/* O "anterior" — a informação mais importante da tela. */}
+                    <span className="text-[11px] text-muted tabular-nums">
+                      {ant ? `${formatPeso(ant.pesoKg)}kg × ${ant.reps}` : "—"}
                     </span>
 
                     <input
-                      inputMode="decimal" placeholder={ant ? formatPeso(ant.pesoKg) : "kg"}
+                      inputMode="decimal"
+                      placeholder={ant ? formatPeso(ant.pesoKg) : "kg"}
                       value={s.pesoKg ?? ""}
-                      onChange={(e) => alterar(exIdx, sIdx, "pesoKg", e.target.value === "" ? null : Number(e.target.value.replace(",", ".")))}
-                      className="w-full min-w-0 rounded-lg bg-card border border-border px-2 py-3 text-center tabular-nums outline-none focus:border-accent"
+                      onChange={(e) =>
+                        alterar(
+                          exIdx,
+                          sIdx,
+                          "pesoKg",
+                          e.target.value === "" ? null : Number(e.target.value.replace(",", ".")),
+                        )
+                      }
+                      className="min-w-0 rounded-lg bg-card border border-border px-1 py-3 text-center tabular-nums outline-none focus:border-accent"
                     />
                     <input
-                      inputMode="numeric" placeholder={ant?.reps != null ? String(ant.reps) : "reps"}
+                      inputMode="numeric"
+                      // Placeholder = faixa alvo da rotina, igual ao Hevy.
+                      placeholder={
+                        ex.repsAlvoMin && ex.repsAlvoMax
+                          ? `${ex.repsAlvoMin}-${ex.repsAlvoMax}`
+                          : ant?.reps != null
+                            ? String(ant.reps)
+                            : "reps"
+                      }
                       value={s.reps ?? ""}
-                      onChange={(e) => alterar(exIdx, sIdx, "reps", e.target.value === "" ? null : Number(e.target.value))}
-                      className="w-full min-w-0 rounded-lg bg-card border border-border px-2 py-3 text-center tabular-nums outline-none focus:border-accent"
+                      onChange={(e) =>
+                        alterar(exIdx, sIdx, "reps", e.target.value === "" ? null : Number(e.target.value))
+                      }
+                      className="min-w-0 rounded-lg bg-card border border-border px-1 py-3 text-center tabular-nums outline-none focus:border-accent"
                     />
 
                     {/* 44×44pt — mínimo da HIG da Apple, com a mão suada. */}
@@ -256,7 +378,7 @@ export function SessaoAtiva({
               onClick={() => addSerie(exIdx)}
               className="mt-2 w-full rounded-lg border border-dashed border-border py-2.5 text-xs text-muted"
             >
-              + série
+              + Adicionar série
             </button>
           </section>
         ))}
@@ -264,16 +386,25 @@ export function SessaoAtiva({
 
       {erro && <p className="px-4 pb-2 text-sm text-red-400">{erro}</p>}
 
-      {/* Ação primária na zona do polegar. */}
-      <div className="sticky bottom-0 px-4 pt-2 pb-safe bg-background/95 backdrop-blur border-t border-border">
-        <button
-          onClick={finalizar}
-          disabled={salvando || feitas === 0}
-          className="w-full rounded-2xl bg-accent text-black font-semibold py-5 text-base disabled:opacity-30"
-        >
-          {salvando ? "salvando…" : `Finalizar treino${feitas ? ` (${feitas})` : ""}`}
-        </button>
-      </div>
+      {/* Timer de descanso, na zona do polegar. Aparece só quando está correndo. */}
+      {restante !== null && restante > -3 && (
+        <div className="sticky bottom-0 px-4 pt-2 pb-safe bg-background/95 backdrop-blur border-t border-border">
+          <div className="flex items-center gap-3 rounded-2xl bg-card border border-border px-4 py-3">
+            <span className="text-xs text-muted">Descanso</span>
+            <span
+              className={`text-2xl tabular-nums font-medium ${restante <= 0 ? "text-accent" : ""}`}
+            >
+              {restante <= 0 ? "acabou" : mmss(restante)}
+            </span>
+            <button
+              onClick={() => setDescansoAte(null)}
+              className="ml-auto text-xs text-muted px-3 py-2"
+            >
+              pular
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
