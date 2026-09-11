@@ -15,7 +15,7 @@ Projeto irmão, usado como **referência de padrão** (nunca de domínio): `C:\d
 - **Supabase** (Postgres + Auth) — projeto novo em **`sa-east-1` (São Paulo)**. O leilões-app está em West US e registra isso como subótimo; não repetir.
 - **Zod**, **react-hook-form**, **date-fns** (pt-BR)
 - **IndexedDB** (`idb`) como caminho de leitura offline + **service worker escrito à mão**
-- Deploy **Vercel Hobby**, auto-deploy do `main`
+- Deploy **Vercel Hobby**, auto-deploy do `main`. **`vercel.json` fixa a região em `gru1`** (São Paulo): o padrão é `iad1` (Washington), e com o banco em `sa-east-1` cada consulta atravessava o hemisfério duas vezes. Medido em produção pelo `x-vercel-id`, que mostrava `gru1::iad1` — borda em SP, função nos EUA.
 
 ## Comandos
 
