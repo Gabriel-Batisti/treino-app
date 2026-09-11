@@ -101,9 +101,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ erro: "nenhum usuário cadastrado" }, { status: 500 });
   }
 
-  const { error } = await db.from("cardios").upsert(
-    {
-      id: crypto.randomUUID(),
+  // Idempotência sem ON CONFLICT: o índice de `origem_id` é PARCIAL (só vale
+  // quando não é nulo, pra o registro manual poder ter vários nulos), e o
+  // Postgres não aceita índice parcial em ON CONFLICT. Procurar antes é a
+  // alternativa — e com um usuário só não há corrida a temer.
+  const { data: existente } = await db
+    .from("cardios")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("origem_id", c.origem_id)
+    .maybeSingle();
+
+  const linha = {
+      id: existente?.id ?? crypto.randomUUID(),
       user_id: userId,
       tipo,
       fonte: "apple_saude",
@@ -115,11 +125,12 @@ export async function POST(request: NextRequest) {
       distancia_km: c.distancia_km ?? null,
       fc_media: c.fc_media != null ? Math.round(c.fc_media) : null,
       fc_max: c.fc_max != null ? Math.round(c.fc_max) : null,
-    },
-    // Sem isto, disparo duplo criaria duas linhas: o id é novo a cada chamada,
-    // e é o `origem_id` que identifica o treino.
-    { onConflict: "user_id,origem_id" },
-  );
+      excluido_em: null,
+  };
+
+  // Upsert por id: como o id reaproveita o da linha existente quando ela já
+  // existe, disparo duplo atualiza em vez de duplicar.
+  const { error } = await db.from("cardios").upsert(linha);
 
   if (error) {
     if (error.message.includes("origem_id") || error.message.includes("fc_media")) {
