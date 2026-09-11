@@ -11,11 +11,13 @@
 import { puxarDadosLocais } from "@/app/actions/sync";
 import { salvarSessao } from "@/app/actions/treino";
 import { salvarCardio } from "@/app/actions/cardio";
+import { criarExercicio } from "@/app/actions/exercicios";
 import {
   lerFila,
   removerDaFila,
   marcarFalha,
   gravarRotinas,
+  gravarExercicios,
   gravarDesempenho,
   gravarMeta,
   lerMeta,
@@ -38,7 +40,12 @@ async function empurrar(): Promise<{ enviados: number; pendentes: number }> {
   for (const p of fila) {
     if (p.tentativas >= MAX_TENTATIVAS) continue;
     try {
-      const r = p.tipo === "sessao" ? await salvarSessao(p.payload) : await salvarCardio(p.payload);
+      const r =
+        p.tipo === "sessao"
+          ? await salvarSessao(p.payload)
+          : p.tipo === "cardio"
+            ? await salvarCardio(p.payload)
+            : await criarExercicio(p.payload);
       if (r.ok) {
         await removerDaFila(p.id);
         enviados++;
@@ -59,6 +66,7 @@ async function puxar(): Promise<boolean> {
   try {
     const r = await puxarDadosLocais();
     if (!r.ok) return false;
+    await gravarExercicios(r.data.exercicios);
     await gravarRotinas(r.data.rotinas);
     await gravarDesempenho(r.data.desempenho);
     await gravarMeta("ultimo_sync", r.data.geradoEm);

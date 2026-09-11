@@ -44,13 +44,22 @@ export default function Rotinas() {
         <h1 className="text-2xl font-semibold tracking-tight">Treino</h1>
       </header>
 
-      <Link
-        href="/cardio"
-        className="mt-2 rounded-2xl bg-card border border-border py-4 flex items-center justify-center gap-2 text-sm"
-      >
-        <span className="text-accent text-lg leading-none">＋</span>
-        Registrar cardio
-      </Link>
+      <div className="mt-2 flex flex-col gap-2">
+        <Link
+          href="/sessao"
+          className="rounded-2xl bg-card border border-border py-4 flex items-center justify-center gap-2 text-sm"
+        >
+          <span className="text-accent text-lg leading-none">＋</span>
+          Iniciar treino vazio
+        </Link>
+        <Link
+          href="/cardio"
+          className="rounded-2xl bg-card border border-border py-4 flex items-center justify-center gap-2 text-sm"
+        >
+          <span className="text-accent text-lg leading-none">＋</span>
+          Registrar cardio
+        </Link>
+      </div>
 
       <h2 className="mt-6 text-lg font-medium">Rotinas</h2>
 

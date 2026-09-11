@@ -13,7 +13,7 @@
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
 
 const NOME = "treino-local";
-const VERSAO = 1;
+const VERSAO = 2;
 
 export interface RotinaLocal {
   id: string;
@@ -34,6 +34,22 @@ export interface RotinaLocal {
   }[];
 }
 
+/**
+ * O catálogo inteiro no aparelho. Entrou na v2: sem ele, o seletor de exercício
+ * não abriria sem rede — e trocar um exercício no meio do treino é exatamente
+ * uma coisa que se faz na academia, com sinal ruim.
+ */
+export interface ExercicioLocal {
+  id: string;
+  nome: string;
+  nomeBusca: string;
+  grupoMuscular: string | null;
+  equipamento: string | null;
+  modoMedicao: string;
+  usos: number;
+  ultimoUsoEm: string | null;
+}
+
 export interface DesempenhoLocal {
   exercicioId: string;
   dataLocal: string;
@@ -43,7 +59,7 @@ export interface DesempenhoLocal {
 /** Uma gravação esperando rede. `tentativas` evita ficar batendo em erro fatal. */
 export interface PendenciaLocal {
   id: string;
-  tipo: "sessao" | "cardio";
+  tipo: "sessao" | "cardio" | "exercicio";
   payload: unknown;
   criadoEm: number;
   tentativas: number;
@@ -52,6 +68,7 @@ export interface PendenciaLocal {
 
 interface Esquema extends DBSchema {
   rotinas: { key: string; value: RotinaLocal };
+  exercicios: { key: string; value: ExercicioLocal };
   desempenho: { key: string; value: DesempenhoLocal };
   fila: { key: string; value: PendenciaLocal };
   meta: { key: string; value: { chave: string; valor: string } };
@@ -61,11 +78,15 @@ let promessa: Promise<IDBPDatabase<Esquema>> | null = null;
 
 function abrir(): Promise<IDBPDatabase<Esquema>> {
   promessa ??= openDB<Esquema>(NOME, VERSAO, {
+    // `upgrade` roda pra QUALQUER versão anterior, inclusive instalação nova.
+    // Por isso cada store é criada só se ainda não existir, em vez de um
+    // switch por versão: mais simples e não quebra quem pula uma versão.
     upgrade(db) {
-      db.createObjectStore("rotinas", { keyPath: "id" });
-      db.createObjectStore("desempenho", { keyPath: "exercicioId" });
-      db.createObjectStore("fila", { keyPath: "id" });
-      db.createObjectStore("meta", { keyPath: "chave" });
+      if (!db.objectStoreNames.contains("rotinas")) db.createObjectStore("rotinas", { keyPath: "id" });
+      if (!db.objectStoreNames.contains("exercicios")) db.createObjectStore("exercicios", { keyPath: "id" });
+      if (!db.objectStoreNames.contains("desempenho")) db.createObjectStore("desempenho", { keyPath: "exercicioId" });
+      if (!db.objectStoreNames.contains("fila")) db.createObjectStore("fila", { keyPath: "id" });
+      if (!db.objectStoreNames.contains("meta")) db.createObjectStore("meta", { keyPath: "chave" });
     },
   });
   return promessa;
@@ -99,6 +120,41 @@ export function gravarRotinas(rotinas: RotinaLocal[]): Promise<void> {
     await tx.store.clear();
     await Promise.all(rotinas.map((r) => tx.store.put(r)));
     await tx.done;
+  }, undefined);
+}
+
+// ── catálogo de exercícios ───────────────────────────────────────────────────
+
+/**
+ * Ordem do D-014: o mais recente primeiro, depois o mais usado. É o histórico
+ * importado que faz a busca acertar já no primeiro toque.
+ */
+export function lerExercicios(): Promise<ExercicioLocal[]> {
+  return seguro(
+    async (db) =>
+      (await db.getAll("exercicios")).sort((a, b) => {
+        const ua = a.ultimoUsoEm ?? "";
+        const ub = b.ultimoUsoEm ?? "";
+        if (ua !== ub) return ub.localeCompare(ua);
+        return b.usos - a.usos;
+      }),
+    [],
+  );
+}
+
+export function gravarExercicios(itens: ExercicioLocal[]): Promise<void> {
+  return seguro(async (db) => {
+    const tx = db.transaction("exercicios", "readwrite");
+    await tx.store.clear();
+    await Promise.all(itens.map((e) => tx.store.put(e)));
+    await tx.done;
+  }, undefined);
+}
+
+/** Exercício criado offline entra no catálogo local na hora, antes de subir. */
+export function gravarExercicio(item: ExercicioLocal): Promise<void> {
+  return seguro(async (db) => {
+    await db.put("exercicios", item);
   }, undefined);
 }
 

@@ -24,6 +24,17 @@ interface ItemRotina {
 }
 
 export interface DadosLocais {
+  /** Catálogo inteiro — é o que alimenta o seletor de exercício offline. */
+  exercicios: {
+    id: string;
+    nome: string;
+    nomeBusca: string;
+    grupoMuscular: string | null;
+    equipamento: string | null;
+    modoMedicao: string;
+    usos: number;
+    ultimoUsoEm: string | null;
+  }[];
   rotinas: {
     id: string;
     nome: string;
@@ -70,6 +81,11 @@ export async function puxarDadosLocais(): Promise<
   for (const s of ultimas ?? []) {
     if (s.nome && !ultimaVez.has(s.nome)) ultimaVez.set(s.nome, s.data_local);
   }
+
+  const { data: catalogo } = await supabase
+    .from("exercicios")
+    .select("id, nome, nome_busca, grupo_muscular, equipamento, modo_medicao, usos, ultimo_uso_em")
+    .eq("arquivado", false);
 
   const { data: rotinas, error } = await supabase
     .from("rotinas")
@@ -130,6 +146,20 @@ export async function puxarDadosLocais(): Promise<
 
   return {
     ok: true,
-    data: { rotinas: comExercicios, desempenho, geradoEm: new Date().toISOString() },
+    data: {
+      exercicios: (catalogo ?? []).map((e) => ({
+        id: e.id,
+        nome: e.nome,
+        nomeBusca: e.nome_busca,
+        grupoMuscular: e.grupo_muscular,
+        equipamento: e.equipamento,
+        modoMedicao: e.modo_medicao,
+        usos: e.usos,
+        ultimoUsoEm: e.ultimo_uso_em,
+      })),
+      rotinas: comExercicios,
+      desempenho,
+      geradoEm: new Date().toISOString(),
+    },
   };
 }

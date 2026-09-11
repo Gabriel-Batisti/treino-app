@@ -6,6 +6,8 @@ import { enfileirar } from "@/lib/local/db";
 import { sincronizar } from "@/lib/local/sync";
 import { hojeLocal, formatPeso, haQuantoTempo } from "@/lib/format";
 import { e1rm, volume } from "@/lib/treino/calc";
+import { SeletorExercicio } from "@/components/seletor-exercicio";
+import { lerDesempenho, type ExercicioLocal } from "@/lib/local/db";
 
 /**
  * A TELA DE SESSÃO ATIVA — inverte o default do projeto de propósito (D-008).
@@ -109,6 +111,7 @@ export function SessaoAtiva({
   const [agora, setAgora] = useState(() => Date.now());
   /** Timestamp em que o descanso acaba. Guardo o FIM, não o restante. */
   const [descansoAte, setDescansoAte] = useState<number | null>(null);
+  const [seletorAberto, setSeletorAberto] = useState(false);
 
   // Cronômetro por DIFERENÇA DE TIMESTAMP, não por contador incrementado: o
   // iOS congela timer com o app em background e um contador ficaria pra trás.
@@ -186,6 +189,49 @@ export function SessaoAtiva({
     });
     if (iniciarDescanso) setDescansoAte(Date.now() + iniciarDescanso * 1000);
     navigator.vibrate?.(30);
+  }
+
+  /**
+   * Acrescenta um exercício à sessão em andamento.
+   *
+   * Não toca na rotina de propósito: máquina ocupada é coisa do dia, não
+   * mudança de plano. Editar a rotina é outra ação, em outra tela.
+   */
+  async function addExercicio(e: ExercicioLocal) {
+    setSeletorAberto(false);
+
+    // BUSCA O "ANTERIOR" (D-005). Sem isto, adicionar um exercício que você já
+    // fez 61 vezes mostrava "—" no lugar da carga da última sessão — o
+    // contrário do que o app existe pra fazer. O dado já está no aparelho.
+    const mapa = await lerDesempenho([e.id]);
+    const d = mapa.get(e.id);
+    const anterior = d?.series ?? [];
+    const quantasSeries = Math.max(anterior.length, 3);
+
+    setExercicios((prev) => [
+      ...prev,
+      {
+        exercicioId: e.id,
+        nome: e.nome,
+        modoMedicao: e.modoMedicao,
+        seriesAlvo: quantasSeries,
+        repsAlvoMin: null,
+        repsAlvoMax: null,
+        // Herda o descanso do exercício anterior: o padrão do treino de hoje
+        // diz mais que um valor fixo.
+        descansoSeg: prev[prev.length - 1]?.descansoSeg ?? 120,
+        anterior,
+        anteriorEm: d?.dataLocal ?? null,
+        id: crypto.randomUUID(),
+        notas: "",
+        series: Array.from({ length: quantasSeries }, (_, i) => {
+          const serie = novaSerie(i + 1);
+          // Mesma regra da rotina: peso entra preenchido, reps fica placeholder.
+          serie.pesoKg = anterior[i]?.pesoKg ?? anterior[anterior.length - 1]?.pesoKg ?? null;
+          return serie;
+        }),
+      },
+    ]);
   }
 
   function addSerie(exIdx: number) {
@@ -272,11 +318,15 @@ export function SessaoAtiva({
 
       <div className="flex-1 px-4 py-4 flex flex-col gap-7">
         {exercicios.length === 0 && (
-          <p className="text-sm text-muted py-12 text-center">
-            Treino livre ainda não tem seletor de exercício.
-            <br />
-            Volte e escolha uma rotina.
-          </p>
+          <div className="py-12 text-center">
+            <p className="text-sm text-muted">Treino vazio.</p>
+            <button
+              onClick={() => setSeletorAberto(true)}
+              className="mt-4 rounded-2xl bg-accent text-black font-semibold px-6 py-4 text-sm"
+            >
+              ＋ Adicionar exercício
+            </button>
+          </div>
         )}
 
         {exercicios.map((ex, exIdx) => (
@@ -388,7 +438,24 @@ export function SessaoAtiva({
             </button>
           </section>
         ))}
+
+        {exercicios.length > 0 && (
+          <button
+            onClick={() => setSeletorAberto(true)}
+            className="w-full rounded-2xl border border-dashed border-border py-4 text-sm text-muted"
+          >
+            ＋ Adicionar exercício
+          </button>
+        )}
       </div>
+
+      {seletorAberto && (
+        <SeletorExercicio
+          aoEscolher={addExercicio}
+          aoFechar={() => setSeletorAberto(false)}
+          jaNaSessao={exercicios.map((e) => e.exercicioId)}
+        />
+      )}
 
       {erro && <p className="px-4 pb-2 text-sm text-red-400">{erro}</p>}
 
