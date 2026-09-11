@@ -197,7 +197,11 @@ export default async function Inicio() {
           }).length;
 
           return (
-            <article key={s.id} className="rounded-2xl bg-card border border-border p-4">
+            <Link
+              key={s.id}
+              href={`/sessoes/${s.id}`}
+              className="block rounded-2xl bg-card border border-border p-4"
+            >
               <div className="flex items-baseline justify-between gap-3">
                 <h2 className="font-medium">{s.nome ?? "Treino"}</h2>
                 <span className="text-[11px] text-muted shrink-0">
@@ -232,12 +236,10 @@ export default async function Inicio() {
                   </li>
                 ))}
               </ul>
-              {exs.length > 3 && (
-                <p className="mt-2 text-center text-xs text-muted">
-                  Ver mais {exs.length - 3} exercícios
-                </p>
-              )}
-            </article>
+              <p className="mt-2 text-center text-xs text-muted">
+                {exs.length > 3 ? `Ver mais ${exs.length - 3} exercícios` : "Ver treino"}
+              </p>
+            </Link>
           );
         })}
       </section>

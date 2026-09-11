@@ -218,3 +218,35 @@ export function gravarMeta(chave: string, valor: string): Promise<void> {
     await db.put("meta", { chave, valor });
   }, undefined);
 }
+
+// ── rascunho do treino em andamento ──────────────────────────────────────────
+
+/**
+ * O treino em andamento vive em estado do React. Um toque errado no botão
+ * voltar, ou o iOS descartando a aba em segundo plano, apagava tudo — e treino
+ * perdido é o dado irreversível que o D-007 existe pra proteger.
+ *
+ * Guardado no store `meta` como JSON, e não em store própria: é uma linha só,
+ * substituída inteira a cada alteração. Store nova custaria mais uma versão de
+ * schema sem ganho nenhum.
+ */
+const CHAVE_RASCUNHO = "rascunho_sessao";
+
+export function salvarRascunho(dados: unknown): Promise<void> {
+  return gravarMeta(CHAVE_RASCUNHO, JSON.stringify(dados));
+}
+
+export async function lerRascunho<T>(): Promise<T | null> {
+  const cru = await lerMeta(CHAVE_RASCUNHO);
+  if (!cru) return null;
+  try {
+    return JSON.parse(cru) as T;
+  } catch {
+    // Rascunho corrompido não pode impedir de treinar.
+    return null;
+  }
+}
+
+export function limparRascunho(): Promise<void> {
+  return gravarMeta(CHAVE_RASCUNHO, "");
+}

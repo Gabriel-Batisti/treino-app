@@ -7,7 +7,13 @@ import { sincronizar } from "@/lib/local/sync";
 import { hojeLocal, formatPeso, haQuantoTempo } from "@/lib/format";
 import { e1rm, volume } from "@/lib/treino/calc";
 import { SeletorExercicio } from "@/components/seletor-exercicio";
-import { lerDesempenho, type ExercicioLocal } from "@/lib/local/db";
+import {
+  lerDesempenho,
+  salvarRascunho,
+  lerRascunho,
+  limparRascunho,
+  type ExercicioLocal,
+} from "@/lib/local/db";
 
 /**
  * A TELA DE SESSÃO ATIVA — inverte o default do projeto de propósito (D-008).
@@ -118,6 +124,47 @@ export function SessaoAtiva({
   const [seletorAberto, setSeletorAberto] = useState(false);
   /** null = não perguntou ainda. Mapa exercicioId -> incluir na rotina. */
   const [aAdicionarNaRotina, setAAdicionarNaRotina] = useState<Record<string, boolean> | null>(null);
+  const [confirmandoDescarte, setConfirmandoDescarte] = useState(false);
+  const [retomado, setRetomado] = useState(false);
+  /** Só grava rascunho depois de tentar restaurar, senão o vazio sobrescreve. */
+  const prontoPraRascunho = useRef(false);
+
+  /**
+   * Retoma o treino que ficou pela metade.
+   *
+   * Sem isto, tocar em voltar sem querer — ou o iOS descartar a aba em segundo
+   * plano — apagava o treino inteiro. É o "rascunho protege o dado" do D-007,
+   * que até aqui só valia na hora de concluir.
+   */
+  useEffect(() => {
+    let vivo = true;
+    (async () => {
+      const r = await lerRascunho<{
+        rotinaId: string | null;
+        inicioEm: string;
+        exercicios: ExercicioEmAndamento[];
+      }>();
+      // Rascunho de outra rotina fica onde está: some da tela, mas continua lá
+      // pra quando você voltar naquela rotina.
+      if (vivo && r && r.rotinaId === rotinaId && r.exercicios.length > 0) {
+        inicioRef.current = r.inicioEm;
+        setExercicios(r.exercicios);
+        setRetomado(true);
+      }
+      prontoPraRascunho.current = true;
+    })();
+    return () => {
+      vivo = false;
+    };
+    // Só no início: depois disso quem manda é o estado local.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /** Grava o rascunho a cada alteração. Substituição inteira, é barato. */
+  useEffect(() => {
+    if (!prontoPraRascunho.current) return;
+    void salvarRascunho({ rotinaId, inicioEm: inicioRef.current, exercicios });
+  }, [exercicios, rotinaId]);
 
   // Cronômetro por DIFERENÇA DE TIMESTAMP, não por contador incrementado: o
   // iOS congela timer com o app em background e um contador ficaria pra trás.
@@ -165,7 +212,15 @@ export function SessaoAtiva({
     (exIdx: number, sIdx: number, campo: "pesoKg" | "reps", valor: number | null) => {
       setExercicios((prev) => {
         const cp = structuredClone(prev);
-        cp[exIdx].series[sIdx][campo] = valor;
+        const serie = cp[exIdx].series[sIdx];
+        serie[campo] = valor;
+        // Apagar as reps de uma série JÁ MARCADA desmarca ela. Sem isto dava
+        // pra salvar série "feita" sem repetição — aconteceu, e foi parar no
+        // banco com volume nulo.
+        if (campo === "reps" && valor == null && serie.concluida) {
+          serie.concluida = false;
+          serie.registradaEm = null;
+        }
         return cp;
       });
     },
@@ -337,15 +392,29 @@ export function SessaoAtiva({
     }
     // Dispara sem esperar: se não houver rede, fica na fila e sobe depois.
     void sincronizar();
+    await limparRascunho();
     router.push("/");
     router.refresh();
+  }
+
+  /** Descarta o treino em andamento. Nada foi gravado ainda — só o rascunho. */
+  async function descartar() {
+    await limparRascunho();
+    router.push(rotinaId ? `/rotinas/${rotinaId}` : "/rotinas");
   }
 
   return (
     <main className="flex-1 flex flex-col pb-safe">
       <header className="pt-safe sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-border">
         <div className="px-4 pt-4 flex items-center justify-between gap-3">
-          <h1 className="text-lg font-medium truncate">{nomeRotina ?? "Treino livre"}</h1>
+          <button
+            onClick={() => setConfirmandoDescarte(true)}
+            aria-label="descartar treino"
+            className="size-9 -ml-2 shrink-0 grid place-items-center text-muted text-xl leading-none"
+          >
+            ×
+          </button>
+          <h1 className="text-lg font-medium truncate flex-1">{nomeRotina ?? "Treino livre"}</h1>
           <button
             onClick={aoConcluir}
             disabled={salvando || feitas === 0}
@@ -368,6 +437,12 @@ export function SessaoAtiva({
           ))}
         </div>
       </header>
+
+      {retomado && (
+        <p className="mx-4 mt-3 rounded-xl border border-accent/40 bg-accent/10 px-4 py-2.5 text-[11px] text-accent">
+          Treino retomado de onde você parou.
+        </p>
+      )}
 
       <div className="flex-1 px-4 py-4 flex flex-col gap-7">
         {exercicios.length === 0 && (
@@ -574,6 +649,33 @@ export function SessaoAtiva({
             >
               Não mudar a rotina
             </button>
+          </div>
+        </div>
+      )}
+
+      {confirmandoDescarte && (
+        <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur flex items-center justify-center px-6">
+          <div className="w-full rounded-2xl border border-border bg-card p-5">
+            <h2 className="text-lg font-medium">Descartar este treino?</h2>
+            <p className="mt-2 text-sm text-muted">
+              {feitas > 0
+                ? `${feitas} ${feitas === 1 ? "série já marcada" : "séries já marcadas"} some${feitas === 1 ? "" : "m"} pra sempre. Nada foi salvo ainda.`
+                : "Nada foi marcado ainda."}
+            </p>
+            <div className="mt-4 flex flex-col gap-2">
+              <button
+                onClick={() => setConfirmandoDescarte(false)}
+                className="w-full rounded-xl bg-accent text-black font-semibold py-4 text-sm"
+              >
+                Continuar treinando
+              </button>
+              <button
+                onClick={() => void descartar()}
+                className="w-full rounded-xl border border-border py-4 text-sm text-red-400"
+              >
+                Descartar
+              </button>
+            </div>
           </div>
         </div>
       )}

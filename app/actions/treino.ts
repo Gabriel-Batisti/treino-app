@@ -58,9 +58,11 @@ export async function salvarSessao(payload: unknown): Promise<ResultadoAcao> {
   }
   const s = parsed.data;
 
-  // Só sobe série que foi de fato concluída — linha em branco não vira registro.
+  // Só sobe série de fato concluída E com repetição. O `reps != null` é rede
+  // de segurança: já chegou aqui série marcada com reps nulo (o usuário marcou
+  // e depois limpou o campo), e ela virou registro sem volume no banco.
   const exercicios = s.exercicios
-    .map((e) => ({ ...e, series: e.series.filter((x) => x.concluida) }))
+    .map((e) => ({ ...e, series: e.series.filter((x) => x.concluida && x.reps != null) }))
     .filter((e) => e.series.length > 0);
 
   if (exercicios.length === 0) {
@@ -140,4 +142,34 @@ export async function salvarSessao(payload: unknown): Promise<ResultadoAcao> {
 export async function sair(): Promise<void> {
   const supabase = await createClient();
   await supabase.auth.signOut();
+}
+
+/**
+ * Apaga um treino do histórico — reversível, nunca delete (D-007): treino
+ * apagado por engano leva meses pra reconstruir.
+ *
+ * Usa `status = 'abandonada'` em vez de uma coluna `excluido_em`, e isso
+ * DISPENSA MIGRATION: toda leitura de histórico já filtra por
+ * `status = 'concluida'` — a timeline, vw_ultimo_desempenho,
+ * vw_recorde_exercicio, a contagem do perfil e o sync. O treino some de tudo
+ * de uma vez, e desfazer é trocar o status de volta.
+ *
+ * Custo aceito: "abandonada" passa a significar duas coisas ("comecei e não
+ * terminei" e "apaguei"). Hoje nada no app usa esse status, então não confunde
+ * nada. Se um dia treino abandonado virar recurso, aí sim separa em coluna.
+ */
+export async function excluirSessao(id: string): Promise<ResultadoAcao> {
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return { ok: false, error: "id inválido" };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("sessoes")
+    .update({ status: "abandonada" })
+    .eq("id", id);
+
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/");
+  revalidatePath("/rotinas");
+  return { ok: true, data: null };
 }
