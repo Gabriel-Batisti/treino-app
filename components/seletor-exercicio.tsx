@@ -53,9 +53,12 @@ export function SeletorExercicio({
 
   const filtrados = useMemo(() => {
     if (!todos) return [];
-    const termo = normalizarNome(busca);
-    if (!termo) return todos;
-    return todos.filter((e) => e.nomeBusca.includes(termo));
+    // TODAS as palavras têm que aparecer, em qualquer posição. Substring pura
+    // falhava no caso mais natural: "agachamento smith" não achava
+    // "Agachamento (Smith)" por causa do parêntese no meio.
+    const palavras = normalizarNome(busca).split(" ").filter(Boolean);
+    if (palavras.length === 0) return todos;
+    return todos.filter((e) => palavras.every((p) => e.nomeBusca.includes(p)));
   }, [todos, busca]);
 
   async function criar() {

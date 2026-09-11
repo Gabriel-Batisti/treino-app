@@ -51,6 +51,8 @@ interface ExercicioEmAndamento extends ExercicioDaSessao {
   id: string;
   notas: string;
   series: SerieEmAndamento[];
+  /** Entrou no meio do treino, não veio da rotina — candidato a virar parte dela. */
+  foraDaRotina?: boolean;
 }
 
 function novaSerie(indice: number): SerieEmAndamento {
@@ -96,9 +98,11 @@ function formatDescanso(seg: number | null): string {
 
 export function SessaoAtiva({
   nomeRotina,
+  rotinaId,
   exerciciosIniciais,
 }: {
   nomeRotina: string | null;
+  rotinaId: string | null;
   exerciciosIniciais: ExercicioDaSessao[];
 }) {
   const router = useRouter();
@@ -112,6 +116,8 @@ export function SessaoAtiva({
   /** Timestamp em que o descanso acaba. Guardo o FIM, não o restante. */
   const [descansoAte, setDescansoAte] = useState<number | null>(null);
   const [seletorAberto, setSeletorAberto] = useState(false);
+  /** null = não perguntou ainda. Mapa exercicioId -> incluir na rotina. */
+  const [aAdicionarNaRotina, setAAdicionarNaRotina] = useState<Record<string, boolean> | null>(null);
 
   // Cronômetro por DIFERENÇA DE TIMESTAMP, não por contador incrementado: o
   // iOS congela timer com o app em background e um contador ficaria pra trás.
@@ -224,6 +230,7 @@ export function SessaoAtiva({
         anteriorEm: d?.dataLocal ?? null,
         id: crypto.randomUUID(),
         notas: "",
+        foraDaRotina: true,
         series: Array.from({ length: quantasSeries }, (_, i) => {
           const serie = novaSerie(i + 1);
           // Mesma regra da rotina: peso entra preenchido, reps fica placeholder.
@@ -250,7 +257,38 @@ export function SessaoAtiva({
    * o treino é o dado irreversível, e o requisito é a academia sem sinal
    * (D-007). O upload vira problema do Sincronizador.
    */
-  async function finalizar() {
+  /**
+   * Exercícios feitos hoje que não estão na rotina. É o que a pergunta do
+   * "Concluir" oferece pra incorporar ao template.
+   */
+  function extrasDaRotina() {
+    return exercicios.filter(
+      (e) => e.foraDaRotina && e.series.some((s) => s.concluida),
+    );
+  }
+
+  /**
+   * O "Concluir" abre a pergunta quando houver exercício fora da rotina; só
+   * depois grava. Perguntar DEPOIS de salvar seria pior: o treino já teria ido
+   * embora da tela e a decisão viraria abstrata.
+   */
+  function aoConcluir() {
+    if (rotinaId && extrasDaRotina().length > 0 && aAdicionarNaRotina === null) {
+      setAAdicionarNaRotina(
+        Object.fromEntries(extrasDaRotina().map((e) => [e.exercicioId, true])),
+      );
+      return;
+    }
+    void finalizar();
+  }
+
+  /**
+   * `inclusoes` vem por ARGUMENTO, não do estado: "Não mudar a rotina" chama
+   * setState e finalizar no mesmo tique, e a closure ainda veria o valor
+   * antigo — os exercícios entrariam na rotina mesmo tendo sido recusados.
+   */
+  async function finalizar(inclusoes?: Record<string, boolean>) {
+    const escolhidos = inclusoes ?? aAdicionarNaRotina;
     setSalvando(true);
     setErro(null);
     const sessaoId = crypto.randomUUID();
@@ -282,6 +320,21 @@ export function SessaoAtiva({
     };
 
     await enfileirar({ id: sessaoId, tipo: "sessao", payload });
+
+    // Inclusões na rotina vão pela MESMA fila: finalizar treino na academia
+    // não pode depender de rede (D-007).
+    if (rotinaId && escolhidos) {
+      let ordem = exercicios.length;
+      for (const ex of extrasDaRotina()) {
+        if (!escolhidos[ex.exercicioId]) continue;
+        const id = crypto.randomUUID();
+        await enfileirar({
+          id,
+          tipo: "rotina_exercicio",
+          payload: { id, rotinaId, exercicioId: ex.exercicioId, ordem: ordem++ },
+        });
+      }
+    }
     // Dispara sem esperar: se não houver rede, fica na fila e sobe depois.
     void sincronizar();
     router.push("/");
@@ -294,7 +347,7 @@ export function SessaoAtiva({
         <div className="px-4 pt-4 flex items-center justify-between gap-3">
           <h1 className="text-lg font-medium truncate">{nomeRotina ?? "Treino livre"}</h1>
           <button
-            onClick={finalizar}
+            onClick={aoConcluir}
             disabled={salvando || feitas === 0}
             className="shrink-0 rounded-full bg-accent text-black font-semibold px-5 py-2 text-sm disabled:opacity-30"
           >
@@ -448,6 +501,82 @@ export function SessaoAtiva({
           </button>
         )}
       </div>
+
+      {/* Pergunta do "Concluir": o que foi feito hoje fora da rotina entra nela? */}
+      {aAdicionarNaRotina !== null && (
+        <div className="fixed inset-0 z-50 bg-background flex flex-col pt-safe pb-safe">
+          <div className="flex-1 overflow-y-auto px-4 pt-8">
+            <h2 className="text-xl font-semibold tracking-tight">Atualizar a rotina?</h2>
+            <p className="mt-2 text-sm text-muted">
+              {extrasDaRotina().length === 1 ? "Este exercício não estava" : "Estes exercícios não estavam"}{" "}
+              em <span className="text-foreground">{nomeRotina}</span>. Marque o que deve passar a
+              fazer parte dela.
+            </p>
+
+            <ul className="mt-5 flex flex-col gap-2">
+              {extrasDaRotina().map((ex) => {
+                const marcado = aAdicionarNaRotina[ex.exercicioId];
+                return (
+                  <li key={ex.exercicioId}>
+                    <button
+                      onClick={() =>
+                        setAAdicionarNaRotina((prev) => ({
+                          ...prev!,
+                          [ex.exercicioId]: !marcado,
+                        }))
+                      }
+                      aria-pressed={marcado}
+                      className={`w-full rounded-2xl border p-4 flex items-center gap-3 text-left ${
+                        marcado ? "bg-card border-accent" : "bg-card border-border"
+                      }`}
+                    >
+                      <span
+                        className={`size-6 shrink-0 rounded-md border grid place-items-center text-sm ${
+                          marcado
+                            ? "bg-accent border-accent text-black"
+                            : "border-border text-transparent"
+                        }`}
+                      >
+                        ✓
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate">{ex.nome}</span>
+                        <span className="block text-[11px] text-muted">
+                          {ex.series.filter((s) => s.concluida).length} séries hoje
+                        </span>
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+
+            <p className="mt-5 text-[11px] text-muted">
+              O que você desmarcar continua salvo no treino de hoje — só não entra
+              na rotina.
+            </p>
+          </div>
+
+          <div className="px-4 pt-2 border-t border-border flex flex-col gap-2">
+            <button
+              onClick={() => void finalizar()}
+              disabled={salvando}
+              className="w-full rounded-2xl bg-accent text-black font-semibold py-5 text-base disabled:opacity-40"
+            >
+              {salvando ? "salvando…" : "Concluir treino"}
+            </button>
+            <button
+              // Passa {} direto: depender do setState acima faria a closure
+              // ver o valor antigo e adicionar o que você acabou de recusar.
+              onClick={() => void finalizar({})}
+              disabled={salvando}
+              className="w-full py-3 text-center text-sm text-muted"
+            >
+              Não mudar a rotina
+            </button>
+          </div>
+        </div>
+      )}
 
       {seletorAberto && (
         <SeletorExercicio

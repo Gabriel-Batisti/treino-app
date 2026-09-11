@@ -27,6 +27,9 @@ export default async function RotinaPage({ params }: PageProps<"/rotinas/[id]">)
     .select(
       "id, nome, notas, rotina_exercicios(id, ordem, series_alvo, reps_alvo_min, reps_alvo_max, descanso_seg, exercicios(id, nome, nome_busca, equipamento))",
     )
+    // Filtra o filho embutido: sem isto, exercício removido da rotina
+    // continuaria aparecendo (a exclusão é `excluido_em`, não delete — D-007).
+    .is("rotina_exercicios.excluido_em", null)
     .eq("id", id)
     .maybeSingle();
 
@@ -88,6 +91,12 @@ export default async function RotinaPage({ params }: PageProps<"/rotinas/[id]">)
             ‹
           </Link>
           <span className="text-sm font-medium truncate">{rotina.nome}</span>
+          <Link
+            href={`/rotinas/${rotina.id}/editar`}
+            className="ml-auto shrink-0 rounded-full border border-border px-4 py-2 text-xs text-accent"
+          >
+            Editar
+          </Link>
         </div>
       </header>
 

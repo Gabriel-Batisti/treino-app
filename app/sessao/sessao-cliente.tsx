@@ -65,5 +65,11 @@ export function SessaoCliente() {
     return <main className="flex-1 grid place-items-center text-sm text-muted">carregando…</main>;
   }
 
-  return <SessaoAtiva nomeRotina={estado.nome} exerciciosIniciais={estado.exercicios} />;
+  return (
+    <SessaoAtiva
+      nomeRotina={estado.nome}
+      rotinaId={rotinaId}
+      exerciciosIniciais={estado.exercicios}
+    />
+  );
 }

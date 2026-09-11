@@ -15,6 +15,7 @@ import type { UltimoDesempenho } from "@/types/database";
  */
 
 interface ItemRotina {
+  id: string;
   ordem: number;
   series_alvo: number | null;
   reps_alvo_min: number | null;
@@ -42,6 +43,7 @@ export interface DadosLocais {
     arquivada: boolean;
     ultimaVez: string | null;
     exercicios: {
+      rotinaExercicioId: string;
       exercicioId: string;
       nome: string;
       nomeBusca: string;
@@ -90,8 +92,11 @@ export async function puxarDadosLocais(): Promise<
   const { data: rotinas, error } = await supabase
     .from("rotinas")
     .select(
-      "id, nome, ordem, arquivada, rotina_exercicios(ordem, series_alvo, reps_alvo_min, reps_alvo_max, descanso_seg, exercicios(id, nome, nome_busca, modo_medicao))",
+      "id, nome, ordem, arquivada, rotina_exercicios(id, ordem, series_alvo, reps_alvo_min, reps_alvo_max, descanso_seg, exercicios(id, nome, nome_busca, modo_medicao))",
     )
+    // Mesma coisa aqui: sem o filtro, o banco local receberia exercício
+    // removido da rotina e a tela de treino o mostraria offline.
+    .is("rotina_exercicios.excluido_em", null)
     .order("ordem");
   if (error) return { ok: false, error: error.message };
 
@@ -105,6 +110,7 @@ export async function puxarDadosLocais(): Promise<
       .filter((i) => i.exercicios)
       .sort((a, b) => a.ordem - b.ordem)
       .map((i) => ({
+        rotinaExercicioId: i.id,
         exercicioId: i.exercicios!.id,
         nome: i.exercicios!.nome,
         nomeBusca: i.exercicios!.nome_busca,
