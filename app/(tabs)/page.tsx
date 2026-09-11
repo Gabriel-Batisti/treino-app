@@ -41,7 +41,7 @@ export default async function Inicio() {
     supabase
       .from("sessoes")
       .select(
-        "id, nome, data_local, inicio_em, duracao_seg, sessao_exercicios(ordem, exercicio_id, nome_snapshot, exercicios(nome_busca), series(peso_kg, e1rm, volume_kg, concluida, tipo))",
+        "id, nome, data_local, inicio_em, duracao_seg, fc_media, calorias, sessao_exercicios(ordem, exercicio_id, nome_snapshot, exercicios(nome_busca), series(peso_kg, e1rm, volume_kg, concluida, tipo))",
       )
       .eq("status", "concluida")
       .order("inicio_em", { ascending: false })
@@ -231,6 +231,12 @@ export default async function Inicio() {
                   <span className="text-[10px] uppercase tracking-wide text-muted block">Volume</span>
                   {volume.toLocaleString("pt-BR")} kg
                 </span>
+                {s.fc_media != null && (
+                  <span>
+                    <span className="text-[10px] uppercase tracking-wide text-muted block">FC</span>
+                    {s.fc_media} bpm
+                  </span>
+                )}
                 {qtdRecordes > 0 && (
                   <span>
                     <span className="text-[10px] uppercase tracking-wide text-muted block">Recordes</span>

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { casarComSessao } from "@/lib/cardio/casar-sessao";
 
 /**
  * Gravação da sessão de treino.
@@ -132,6 +133,51 @@ export async function salvarSessao(payload: unknown): Promise<ResultadoAcao> {
         ultimo_uso_em: s.inicio_em,
       })
       .eq("id", e.exercicio_id);
+  }
+
+  // ── absorve o treino do Apple Watch, se ele chegou antes ─────────────────
+  // A automação do relógio dispara quando você encerra lá, o que pode ser ANTES
+  // de tocar em Concluir aqui. Nesse caso a rota /api/cardio não achou sessão
+  // e estacionou o treino como cardio. Agora que a sessão existe, ela reivindica.
+  //
+  // Falhar aqui não pode derrubar o salvamento do treino — é enfeite, não dado.
+  try {
+    const { data: candidatos } = await supabase
+      .from("cardios")
+      .select("id, origem_id, inicio_em, duracao_min, fc_media, fc_max, calorias")
+      .eq("user_id", auth.user.id)
+      .eq("fonte", "apple_saude")
+      .is("excluido_em", null)
+      .eq("data_local", s.data_local);
+
+    for (const cand of candidatos ?? []) {
+      if (!cand.origem_id) continue;
+      const { sessao } = casarComSessao(
+        [{ id: s.id, inicio_em: s.inicio_em, fim_em: s.fim_em, apple_origem_id: null }],
+        new Date(cand.inicio_em),
+        cand.duracao_min,
+        cand.origem_id,
+      );
+      if (!sessao) continue;
+
+      await supabase
+        .from("sessoes")
+        .update({
+          fc_media: cand.fc_media,
+          fc_max: cand.fc_max,
+          calorias: cand.calorias,
+          apple_origem_id: cand.origem_id,
+        })
+        .eq("id", s.id);
+      // O treino agora pertence à sessão: some da lista de cardios.
+      await supabase
+        .from("cardios")
+        .update({ excluido_em: new Date().toISOString() })
+        .eq("id", cand.id);
+      break; // uma sessão absorve no máximo um treino do relógio
+    }
+  } catch {
+    /* sem as colunas da 0006, ou sem rede: o treino já está salvo */
   }
 
   revalidatePath("/");

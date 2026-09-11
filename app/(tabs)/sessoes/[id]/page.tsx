@@ -32,7 +32,7 @@ export default async function TreinoPage({ params }: PageProps<"/sessoes/[id]">)
   const { data: sessao } = await supabase
     .from("sessoes")
     .select(
-      "id, nome, data_local, inicio_em, duracao_seg, notas, origem, sessao_exercicios(ordem, nome_snapshot, notas, exercicios(id, nome_busca), series(indice, tipo, peso_kg, reps, e1rm, volume_kg, concluida))",
+      "id, nome, data_local, inicio_em, duracao_seg, notas, origem, fc_media, fc_max, calorias, sessao_exercicios(ordem, nome_snapshot, notas, exercicios(id, nome_busca), series(indice, tipo, peso_kg, reps, e1rm, volume_kg, concluida))",
     )
     .eq("id", id)
     .eq("status", "concluida")
@@ -73,6 +73,16 @@ export default async function TreinoPage({ params }: PageProps<"/sessoes/[id]">)
             ["Tempo", sessao.duracao_seg ? `${Math.round(sessao.duracao_seg / 60)} min` : "—"],
             ["Volume", `${volume.toLocaleString("pt-BR")} kg`],
             ["Séries", String(todas.length)],
+            // Só aparecem quando o Apple Watch mandou.
+            ...(sessao.fc_media != null
+              ? ([["FC média", `${sessao.fc_media} bpm`]] as [string, string][])
+              : []),
+            ...(sessao.fc_max != null
+              ? ([["FC máx", `${sessao.fc_max} bpm`]] as [string, string][])
+              : []),
+            ...(sessao.calorias != null
+              ? ([["Calorias", `${sessao.calorias} kcal`]] as [string, string][])
+              : []),
           ].map(([rotulo, valor]) => (
             <div key={rotulo} className="rounded-xl bg-card border border-border p-3">
               <p className="text-[10px] uppercase tracking-wide text-muted">{rotulo}</p>
