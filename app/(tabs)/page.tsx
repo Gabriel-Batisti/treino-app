@@ -49,7 +49,7 @@ export default async function Inicio() {
     // A 0002 pode ainda não ter sido rodada — a tela não pode quebrar por isso.
     supabase
       .from("cardios")
-      .select("id, tipo, data_local, inicio_em, duracao_min, calorias, distancia_km")
+      .select("id, tipo, data_local, inicio_em, duracao_min, calorias, distancia_km, fc_media, fonte")
       .is("excluido_em", null)
       .order("inicio_em", { ascending: false })
       .limit(20)
@@ -150,7 +150,14 @@ export default async function Inicio() {
             return (
               <article key={c.id} className="rounded-2xl bg-card border border-border p-4">
                 <div className="flex items-baseline justify-between gap-3">
-                  <h2 className="font-medium">{ROTULO_CARDIO[c.tipo] ?? "Cardio"}</h2>
+                  <h2 className="font-medium">
+                    {ROTULO_CARDIO[c.tipo] ?? "Cardio"}
+                    {c.fonte === "apple_saude" && (
+                      <span className="ml-2 text-[10px] font-normal text-accent align-middle">
+                        Apple Watch
+                      </span>
+                    )}
+                  </h2>
                   <span className="text-[11px] text-muted shrink-0">
                     {haQuantoTempo(c.data_local)} · {formatData(c.data_local)}
                   </span>
@@ -170,6 +177,12 @@ export default async function Inicio() {
                     <span>
                       <span className="text-[10px] uppercase tracking-wide text-muted block">Distância</span>
                       {c.distancia_km} km
+                    </span>
+                  )}
+                  {c.fc_media != null && (
+                    <span>
+                      <span className="text-[10px] uppercase tracking-wide text-muted block">FC média</span>
+                      {c.fc_media} bpm
                     </span>
                   )}
                 </div>
@@ -255,4 +268,6 @@ interface Cardio {
   duracao_min: number;
   calorias: number | null;
   distancia_km: number | null;
+  fc_media: number | null;
+  fonte: string | null;
 }

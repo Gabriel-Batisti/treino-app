@@ -37,7 +37,9 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Tudo, menos estáticos, imagens, o service worker e a rota de treino.
-    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|sessao|.*\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    // Tudo, menos estáticos, imagens, o service worker, a rota de treino e a
+    // API. `api` fora daqui é obrigatório: o Atalho do iOS não tem sessão, e o
+    // gate mandaria a requisição dele pro /login. Mesmo erro do /auth/confirm.
+    "/((?!api|_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|sessao|.*\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };
