@@ -50,6 +50,10 @@ export default async function Perfil() {
           <span>Peso e bioimpedância</span>
           <span className="text-muted">›</span>
         </Link>
+        <Link href="/fotos" className="px-4 py-4 flex items-center justify-between">
+          <span>Fotos de acompanhamento</span>
+          <span className="text-muted">›</span>
+        </Link>
         <Link href="/exercicios" className="px-4 py-4 flex items-center justify-between">
           <span>Exercícios</span>
           <span className="text-muted">›</span>
