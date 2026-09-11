@@ -143,6 +143,117 @@ export type Database = {
         }
         Relationships: []
       }
+      fotos: {
+        Row: {
+          altura: number | null
+          angulo: string
+          arquivo_path: string
+          atualizado_em: string
+          criado_em: string
+          data_local: string
+          excluido_em: string | null
+          id: string
+          largura: number | null
+          notas: string | null
+          tirada_em: string
+          user_id: string
+        }
+        Insert: {
+          altura?: number | null
+          angulo?: string
+          arquivo_path: string
+          atualizado_em?: string
+          criado_em?: string
+          data_local: string
+          excluido_em?: string | null
+          id: string
+          largura?: number | null
+          notas?: string | null
+          tirada_em: string
+          user_id?: string
+        }
+        Update: {
+          altura?: number | null
+          angulo?: string
+          arquivo_path?: string
+          atualizado_em?: string
+          criado_em?: string
+          data_local?: string
+          excluido_em?: string | null
+          id?: string
+          largura?: number | null
+          notas?: string | null
+          tirada_em?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      medidas: {
+        Row: {
+          agua_pct: number | null
+          arquivo_path: string | null
+          atualizado_em: string
+          cintura_cm: number | null
+          criado_em: string
+          data_local: string
+          excluido_em: string | null
+          gordura_pct: number | null
+          gordura_visceral: number | null
+          id: string
+          massa_gorda_kg: number | null
+          massa_magra_kg: number | null
+          massa_muscular_kg: number | null
+          medido_em: string
+          notas: string | null
+          origem: string
+          peso_kg: number
+          tmb_kcal: number | null
+          user_id: string
+        }
+        Insert: {
+          agua_pct?: number | null
+          arquivo_path?: string | null
+          atualizado_em?: string
+          cintura_cm?: number | null
+          criado_em?: string
+          data_local: string
+          excluido_em?: string | null
+          gordura_pct?: number | null
+          gordura_visceral?: number | null
+          id: string
+          massa_gorda_kg?: number | null
+          massa_magra_kg?: number | null
+          massa_muscular_kg?: number | null
+          medido_em: string
+          notas?: string | null
+          origem?: string
+          peso_kg: number
+          tmb_kcal?: number | null
+          user_id?: string
+        }
+        Update: {
+          agua_pct?: number | null
+          arquivo_path?: string | null
+          atualizado_em?: string
+          cintura_cm?: number | null
+          criado_em?: string
+          data_local?: string
+          excluido_em?: string | null
+          gordura_pct?: number | null
+          gordura_visceral?: number | null
+          id?: string
+          massa_gorda_kg?: number | null
+          massa_magra_kg?: number | null
+          massa_muscular_kg?: number | null
+          medido_em?: string
+          notas?: string | null
+          origem?: string
+          peso_kg?: number
+          tmb_kcal?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       rotina_exercicios: {
         Row: {
           atualizado_em: string
@@ -633,6 +744,11 @@ export type SessaoExercicio = Tabelas["sessao_exercicios"]["Row"];
 export type SessaoExercicioInsert = Tabelas["sessao_exercicios"]["Insert"];
 export type Serie = Tabelas["series"]["Row"];
 export type Cardio = Tabelas["cardios"]["Row"];
+export type Medida = Tabelas["medidas"]["Row"];
+/** Sem `massa_gorda_kg`: é coluna gerada (D-003). */
+export type MedidaInsert = Omit<Tabelas["medidas"]["Insert"], "massa_gorda_kg">;
+export type Foto = Tabelas["fotos"]["Row"];
+export type FotoInsert = Tabelas["fotos"]["Insert"];
 /** Sem `kcal_por_min`: é coluna gerada (D-003). */
 export type CardioInsert = Omit<Tabelas["cardios"]["Insert"], "kcal_por_min">;
 /** Sem `volume_kg` nem `e1rm`: são colunas geradas (D-003). */
