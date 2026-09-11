@@ -46,6 +46,10 @@ export default async function Perfil() {
       </div>
 
       <nav className="mt-6 flex flex-col rounded-2xl bg-card border border-border divide-y divide-border">
+        <Link href="/peso" className="px-4 py-4 flex items-center justify-between">
+          <span>Peso e bioimpedância</span>
+          <span className="text-muted">›</span>
+        </Link>
         <Link href="/exercicios" className="px-4 py-4 flex items-center justify-between">
           <span>Exercícios</span>
           <span className="text-muted">›</span>

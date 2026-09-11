@@ -60,6 +60,21 @@ export default async function Inicio() {
       .then((r) => r, () => ({ data: null })),
   ]);
 
+  // A 0003 pode não ter sido rodada — a faixa some em vez de quebrar a tela.
+  const { data: pesos } = await supabase
+    .from("medidas")
+    .select("data_local, peso_kg")
+    .is("excluido_em", null)
+    .order("data_local", { ascending: false })
+    .limit(2)
+    .then((r) => r, () => ({ data: null }));
+
+  const pesoAtual = (pesos as { data_local: string; peso_kg: number }[] | null)?.[0] ?? null;
+  const pesoAnterior = (pesos as { data_local: string; peso_kg: number }[] | null)?.[1] ?? null;
+  const deltaPeso =
+    pesoAtual && pesoAnterior ? Number(pesoAtual.peso_kg) - Number(pesoAnterior.peso_kg) : null;
+  const pesouHoje = pesoAtual?.data_local === hoje;
+
   const cardios = (cardiosRes as { data: Cardio[] | null }).data ?? [];
   const recordes = new Map(
     ((recordesRes as { data: { exercicio_id: string; melhor_peso: number | null }[] | null }).data ?? [])
@@ -100,6 +115,29 @@ export default async function Inicio() {
       <div className="px-4">
         <CalendarioMes dias={[...mapaDias.values()]} hoje={hoje} />
       </div>
+
+      {pesos !== null && (
+        <Link
+          href="/peso"
+          className="mx-4 mt-3 rounded-2xl bg-card border border-border px-4 py-3.5 flex items-center justify-between gap-3"
+        >
+          <div>
+            <p className="text-[10px] uppercase tracking-wide text-muted">Peso</p>
+            <p className="tabular-nums">
+              {pesoAtual ? `${Number(pesoAtual.peso_kg).toLocaleString("pt-BR")} kg` : "—"}
+              {deltaPeso != null && Math.abs(deltaPeso) >= 0.05 && (
+                <span className={`ml-2 text-xs ${deltaPeso > 0 ? "text-amber-400" : "text-accent"}`}>
+                  {deltaPeso > 0 ? "+" : ""}
+                  {(Math.round(deltaPeso * 10) / 10).toLocaleString("pt-BR")}
+                </span>
+              )}
+            </p>
+          </div>
+          <span className={`text-xs shrink-0 ${pesouHoje ? "text-muted" : "text-accent"}`}>
+            {pesouHoje ? "registrado hoje" : "registrar hoje ›"}
+          </span>
+        </Link>
+      )}
 
       <section className="mt-6 flex flex-col gap-3 px-4">
         {itens.length === 0 && (
