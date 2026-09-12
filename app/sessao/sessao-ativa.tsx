@@ -8,6 +8,7 @@ import { hojeLocal, formatPeso, haQuantoTempo } from "@/lib/format";
 import { e1rm, volume } from "@/lib/treino/calc";
 import { avisarDescansoAcabou, prepararSom, tocarBip } from "@/lib/som";
 import { SeletorExercicio } from "@/components/seletor-exercicio";
+import { Ilustracao } from "@/components/ilustracao";
 import { normalizarNome } from "@/lib/treino/texto";
 import { sugerirSubstitutos, type CandidatoSubstituto } from "@/lib/treino/substituir";
 import {
@@ -704,20 +705,26 @@ export function SessaoAtiva({
 
         {exercicios.map((ex, exIdx) => (
           <section key={ex.id}>
-            <div className="flex items-baseline justify-between gap-2">
-              <h2 className="font-medium text-accent">{ex.nome}</h2>
-              <div className="flex items-baseline gap-2 shrink-0">
+            <div className="flex items-center justify-between gap-2">
+              {/* A imagem do movimento, do tamanho da miniatura do Heavy. É a
+                  mesma base da tela de detalhe — já está no cache do service
+                  worker, então não custa rede na academia. */}
+              <Ilustracao nomeBusca={normalizarNome(ex.nome)} className="size-10" />
+              <h2 className="flex-1 min-w-0 font-medium text-accent truncate">{ex.nome}</h2>
+              <div className="flex items-center gap-2 shrink-0">
                 {ex.anteriorEm && (
                   <span className="text-[11px] text-muted">{haQuantoTempo(ex.anteriorEm)}</span>
                 )}
                 {/* Aparelho ocupado. Fica no cabeçalho do exercício porque é lá
-                    que você olha quando chega na máquina e ela está em uso. */}
+                    que você olha quando chega na máquina e ela está em uso.
+                    Com rótulo, não só o símbolo: ⇄ sozinho não diz o que faz. */}
                 <button
                   onClick={() => void abrirTroca(exIdx)}
                   aria-label={`substituir ${ex.nome}`}
-                  className="size-8 -mr-1 grid place-items-center rounded-lg text-muted text-sm"
+                  className="h-10 px-3 -mr-1 flex items-center gap-1.5 rounded-xl border border-border bg-card text-xs"
                 >
-                  ⇄
+                  <span aria-hidden className="text-sm leading-none">⇄</span>
+                  Trocar
                 </button>
               </div>
             </div>
@@ -1088,13 +1095,16 @@ export function SessaoAtiva({
                   <li key={o.exercicioId}>
                     <button
                       onClick={() => void trocarExercicio(trocando.exIdx, o)}
-                      className="w-full rounded-2xl bg-card border border-border p-4 text-left"
+                      className="w-full rounded-2xl bg-card border border-border p-4 text-left flex items-center gap-3"
                     >
-                      <span className="block">{o.nome}</span>
+                      <Ilustracao nomeBusca={o.nomeBusca} className="size-10" />
+                      <span className="min-w-0 flex-1">
+                      <span className="block truncate">{o.nome}</span>
                       {/* O motivo aparece pra você julgar, não obedecer. */}
                       <span className="block mt-0.5 text-[11px] text-muted">
                         {o.motivo}
                         {o.usos > 0 && ` · ${o.usos} ${o.usos === 1 ? "vez" : "vezes"}`}
+                      </span>
                       </span>
                     </button>
                   </li>
