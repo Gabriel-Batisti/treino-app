@@ -3,7 +3,7 @@
 import { useState, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { salvarMedida } from "@/app/actions/medidas";
+import { lerExame, salvarMedida } from "@/app/actions/medidas";
 import { createClient } from "@/lib/supabase/client";
 import { hojeLocal } from "@/lib/format";
 
@@ -44,6 +44,8 @@ export function FormBioimpedancia() {
   const [salvando, setSalvando] = useState(false);
   const [etapa, setEtapa] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
+  const [lendo, setLendo] = useState(false);
+  const [lido, setLido] = useState<number | null>(null);
 
   const numero = (s: string | undefined): number | null => {
     const v = s?.trim().replace(",", ".");
@@ -57,12 +59,48 @@ export function FormBioimpedancia() {
 
   function escolher(f: File | null) {
     setErro(null);
+    setLido(null);
     if (!f) return setArquivo(null);
     if (f.size > TAMANHO_MAX) {
       setErro("Arquivo acima de 10 MB. Tire uma foto menor ou comprima o PDF.");
       return;
     }
     setArquivo(f);
+    if (f.type === "application/pdf") void preencherPeloExame(f);
+  }
+
+  /**
+   * Lê o laudo e preenche os campos VAZIOS.
+   *
+   * Não sobrescreve o que você já digitou: se você corrigiu um número à mão, o
+   * PDF não tem o direito de desfazer. E falhar aqui não atrapalha nada — o
+   * formulário continua digitável, que é como ele funcionava antes.
+   */
+  async function preencherPeloExame(f: File) {
+    setLendo(true);
+    const fd = new FormData();
+    fd.set("arquivo", f);
+    const r = await lerExame(fd);
+    setLendo(false);
+    if (!r.ok || r.data.achados === 0) return;
+
+    const l = r.data;
+    if (l.data_local) setData(l.data_local);
+    if (l.peso_kg != null) setPeso((p) => p.trim() || String(l.peso_kg));
+    setValores((v) => {
+      const novo = { ...v };
+      const por = (k: Chave, n: number | null) => {
+        if (n != null && !novo[k]?.trim()) novo[k] = String(n);
+      };
+      por("gordura_pct", l.gordura_pct);
+      por("massa_muscular_kg", l.massa_muscular_kg);
+      por("massa_magra_kg", l.massa_magra_kg);
+      por("agua_pct", l.agua_pct);
+      por("gordura_visceral", l.gordura_visceral);
+      por("tmb_kcal", l.tmb_kcal);
+      return novo;
+    });
+    setLido(l.achados);
   }
 
   async function salvar() {
@@ -172,10 +210,19 @@ export function FormBioimpedancia() {
               </>
             )}
           </button>
+          {lendo && (
+            <p className="mt-2 text-center text-xs text-muted">lendo o exame…</p>
+          )}
+          {lido != null && !lendo && (
+            <p className="mt-2 text-center text-xs text-accent">
+              {lido} {lido === 1 ? "valor lido" : "valores lidos"} do laudo — confira abaixo
+            </p>
+          )}
           {arquivo && (
             <button
               onClick={() => {
                 setArquivo(null);
+                setLido(null);
                 if (entrada.current) entrada.current.value = "";
               }}
               className="mt-2 w-full py-2 text-center text-xs text-muted"
@@ -210,7 +257,9 @@ export function FormBioimpedancia() {
 
         <section>
           <h2 className="text-[10px] uppercase tracking-wide text-muted">
-            Valores do exame — o que você não tiver, deixe em branco
+            {lido != null
+              ? "Valores do exame — vieram do PDF, pode corrigir"
+              : "Valores do exame — o que você não tiver, deixe em branco"}
           </h2>
           <div className="mt-2 grid grid-cols-2 gap-3">
             {CAMPOS.map((c) => (

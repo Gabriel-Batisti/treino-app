@@ -8,7 +8,7 @@ import { sincronizar } from "@/lib/local/sync";
 import { hojeLocal } from "@/lib/format";
 
 /**
- * Registro de cardio com cronômetro.
+ * Registro de cardio com cronômetro, ou anotado depois em outra data.
  *
  * O cronômetro guarda o INSTANTE DE INÍCIO, não um contador incrementado: o
  * iOS congela timer com o app em background, e 30 min de esteira com o celular
@@ -60,6 +60,7 @@ export function FormCardio() {
   const [calorias, setCalorias] = useState("");
   const [distancia, setDistancia] = useState("");
   const [intensidade, setIntensidade] = useState<Intensidade | null>("moderado");
+  const [data, setData] = useState(hojeLocal());
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const restaurado = useRef(false);
@@ -128,13 +129,23 @@ export function FormCardio() {
     setErro(null);
     const duracao = inicio != null ? Math.max(1, Math.ceil(decorridoSeg / 60)) : minutos;
     const cardioId = crypto.randomUUID();
+    const hoje = hojeLocal();
+    // Cronômetro mandou? O instante é o de verdade. Data de outro dia? Meio-dia
+    // local — é hora inventada de qualquer jeito, e meio-dia não escorrega pro
+    // dia anterior quando o fuso é convertido pra UTC (D-012).
+    const instante =
+      inicio != null
+        ? new Date(inicio)
+        : data === hoje
+          ? new Date()
+          : new Date(`${data}T12:00:00-03:00`);
     // Mesma regra do treino: grava no aparelho, sobe depois (D-007).
     const payload = {
       id: cardioId,
       tipo,
       // Se o cronômetro rodou, o início é o de verdade.
-      inicio_em: new Date(inicio ?? Date.now()).toISOString(),
-      data_local: hojeLocal(),
+      inicio_em: instante.toISOString(),
+      data_local: inicio != null ? hoje : data,
       duracao_min: duracao,
       calorias: numero(calorias) != null ? Math.round(numero(calorias)!) : null,
       distancia_km: numero(distancia),
@@ -230,6 +241,26 @@ export function FormCardio() {
             </>
           )}
         </section>
+
+        {/* Só faz sentido escolher data pro cardio anotado depois: se o
+            cronômetro rodou, o dia é hoje e ponto. */}
+        {!rodando && (
+          <section>
+            <h2 className="text-[10px] uppercase tracking-wide text-muted">Data</h2>
+            <input
+              type="date"
+              value={data}
+              max={hojeLocal()}
+              onChange={(e) => setData(e.target.value)}
+              className="mt-2 w-full rounded-xl bg-card border border-border px-3 py-4 text-center outline-none focus:border-accent"
+            />
+            {data !== hojeLocal() && (
+              <p className="mt-1.5 text-center text-[11px] text-muted">
+                registrando num dia anterior
+              </p>
+            )}
+          </section>
+        )}
 
         <section className="grid grid-cols-2 gap-3">
           <div>

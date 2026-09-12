@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { lerInbody, type LeituraInbody } from "@/lib/medidas/inbody";
 
 /**
  * Pesagem diária e bioimpedância (tabela `medidas`, migration 0003).
@@ -86,4 +87,37 @@ export async function urlDoExame(caminho: string): Promise<ResultadoAcao<string>
 
   if (error || !data) return { ok: false, error: error?.message ?? "não foi possível abrir" };
   return { ok: true, data: data.signedUrl };
+}
+
+/**
+ * Lê o PDF do laudo e devolve os campos preenchidos.
+ *
+ * POR QUE NO SERVIDOR: o extrator de PDF (`unpdf`) tem ~1 MB. Colocá-lo no
+ * bundle do celular faria toda a navegação do app pagar por uma tela usada uma
+ * vez por mês, e o exame só existe onde há rede de qualquer jeito (D-007).
+ *
+ * O import é dinâmico pelo mesmo motivo do lado do servidor: só a rota que lê
+ * exame carrega o extrator.
+ *
+ * NUNCA lança e nunca impede o salvamento: falhar aqui só significa digitar os
+ * números à mão, que é exatamente o que acontecia antes.
+ */
+export async function lerExame(formData: FormData): Promise<ResultadoAcao<LeituraInbody>> {
+  const supabase = await createClient();
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) return { ok: false, error: "Sessão expirada. Faça login de novo." };
+
+  const arquivo = formData.get("arquivo");
+  if (!(arquivo instanceof File)) return { ok: false, error: "arquivo ausente" };
+  if (arquivo.type !== "application/pdf") return { ok: false, error: "só leio PDF" };
+  if (arquivo.size > 3 * 1024 * 1024) return { ok: false, error: "PDF grande demais pra ler" };
+
+  try {
+    const { extractText, getDocumentProxy } = await import("unpdf");
+    const pdf = await getDocumentProxy(new Uint8Array(await arquivo.arrayBuffer()));
+    const { text } = await extractText(pdf, { mergePages: true });
+    return { ok: true, data: lerInbody(text) };
+  } catch {
+    return { ok: false, error: "não consegui ler este PDF" };
+  }
 }

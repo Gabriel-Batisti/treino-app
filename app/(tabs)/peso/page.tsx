@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { GraficoLinha, type PontoGrafico } from "@/components/grafico-linha";
+import { GraficoMedidas } from "@/components/grafico-medidas";
 import { RegistrarPeso } from "./registrar-peso";
-import { formatData, formatDataCurta, formatPeso, hojeLocal } from "@/lib/format";
+import { formatData, formatPeso, hojeLocal } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +15,8 @@ interface Medida {
   massa_magra_kg: number | null;
   massa_muscular_kg: number | null;
   massa_gorda_kg: number | null;
+  agua_pct: number | null;
+  tmb_kcal: number | null;
   arquivo_path: string | null;
 }
 
@@ -25,7 +27,9 @@ export default async function Peso() {
   // A 0003 pode não ter sido rodada — a tela não pode quebrar por isso.
   const { data, error } = await supabase
     .from("medidas")
-    .select("id, origem, data_local, peso_kg, gordura_pct, massa_magra_kg, massa_muscular_kg, massa_gorda_kg, arquivo_path")
+    .select(
+      "id, origem, data_local, peso_kg, gordura_pct, massa_magra_kg, massa_muscular_kg, massa_gorda_kg, agua_pct, tmb_kcal, arquivo_path",
+    )
     .is("excluido_em", null)
     .order("data_local", { ascending: false })
     .limit(180);
@@ -35,15 +39,6 @@ export default async function Peso() {
 
   const deHoje = medidas.find((m) => m.data_local === hoje && m.origem === "manual");
   const ultima = medidas[0];
-  const anterior = medidas[1];
-  const delta = ultima && anterior ? ultima.peso_kg - anterior.peso_kg : null;
-
-  // Do mais antigo pro mais novo, uma linha por dia.
-  const pontos: PontoGrafico[] = [...medidas]
-    .reverse()
-    .map((m) => ({ rotulo: formatDataCurta(m.data_local), valor: Number(m.peso_kg) }));
-
-  const comGordura = medidas.filter((m) => m.gordura_pct != null);
 
   return (
     <main className="flex-1 flex flex-col pt-safe px-4">
@@ -67,34 +62,9 @@ export default async function Peso() {
 
       <RegistrarPeso hoje={hoje} pesoDeHoje={deHoje?.peso_kg ?? null} ultimoPeso={ultima?.peso_kg ?? null} />
 
-      {pontos.length > 1 && (
+      {medidas.length > 1 && (
         <section className="mt-6 rounded-2xl bg-card border border-border p-4">
-          <div className="flex items-baseline justify-between">
-            <span className="text-lg tabular-nums">{formatPeso(ultima.peso_kg)} kg</span>
-            {delta != null && (
-              <span className={`text-xs tabular-nums ${delta > 0 ? "text-amber-400" : "text-accent"}`}>
-                {delta > 0 ? "+" : ""}
-                {formatPeso(Math.round(delta * 100) / 100)} kg vs. anterior
-              </span>
-            )}
-          </div>
-          <div className="mt-2">
-            <GraficoLinha pontos={pontos} sufixo=" kg" />
-          </div>
-        </section>
-      )}
-
-      {comGordura.length > 1 && (
-        <section className="mt-3 rounded-2xl bg-card border border-border p-4">
-          <p className="text-[10px] uppercase tracking-wide text-muted">Gordura corporal</p>
-          <div className="mt-1">
-            <GraficoLinha
-              pontos={[...comGordura]
-                .reverse()
-                .map((m) => ({ rotulo: formatDataCurta(m.data_local), valor: Number(m.gordura_pct) }))}
-              sufixo="%"
-            />
-          </div>
+          <GraficoMedidas medidas={medidas} />
         </section>
       )}
 
