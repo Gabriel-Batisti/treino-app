@@ -9,13 +9,17 @@ import { casarComSessao, type JanelaSessao } from "@/lib/cardio/casar-sessao";
  * Recebe um treino do Apple Saúde, via Atalho do iOS.
  *
  * O QUE ELE FAZ COM O TREINO, nesta ordem:
- *   1. tenta CASAR com uma sessão de musculação do app pelo horário. Casou →
- *      anexa batimentos e calorias nela e não cria cardio nenhum.
- *   2. não casou → grava como cardio.
+ *   1. tipo reconhecido como cardio ("Bicicleta", "Esteira") → grava cardio e
+ *      pronto. Não disputa sessão.
+ *   2. senão, tenta CASAR com uma sessão do app pelo horário. Casou → anexa
+ *      batimentos e calorias nela e não cria cardio nenhum.
+ *   3. não casou → estaciona como cardio "outro", que `salvarSessao` absorve
+ *      quando a sessão aparecer.
  *
- * O casamento vem primeiro, e não o filtro por tipo, porque o usuário registra
- * musculação como "Outro" no relógio. Decidir pelo nome do tipo criaria um
- * cardio falso por cima de cada treino de academia.
+ * O nome do tipo só decide no passo 1, e só pra CONFIRMAR cardio — nunca pra
+ * recusar. É o suficiente pra impedir que a bike do aquecimento seja anexada à
+ * musculação que veio logo depois, sem voltar a depender do tipo pra reconhecer
+ * academia (que é o que quebrava quando o relógio registrava tudo como "Outro").
  *
  * O cardio gravado no passo 2 também serve de ESTACIONAMENTO: se o relógio for
  * encerrado antes de você tocar em Concluir no app, a sessão ainda não existe.
@@ -138,7 +142,27 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ erro: "nenhum usuário cadastrado" }, { status: 500 });
   }
 
-  // ── 1. tenta casar com uma sessão de musculação ────────────────────────────
+  // ── 1. cardio reconhecido não disputa sessão ───────────────────────────────
+  // "Bicicleta", "Esteira", "Corrida" são cardio e ponto. Se eu deixasse eles
+  // tentarem casar, a bike feita 10 minutos antes da musculação — no mesmo
+  // aparelho, no mesmo horário — seria anexada à sessão como se fosse o treino,
+  // e o treino de força chegando depois viraria um cardio falso. Só tenta casar
+  // o que PODE ser academia: treino de força e tipo que eu não reconheço
+  // (inclusive "Outro").
+  const classificacao = classificarTreinoApple(c.tipo);
+  const podeSerAcademia = classificacao.ehForca || !classificacao.reconhecido;
+
+  if (!podeSerAcademia) {
+    const { error } = await gravarComoCardio(db, userId, c, inicio, classificacao.tipo ?? "outro");
+    if (error) return NextResponse.json({ erro: error.message }, { status: 500 });
+    return NextResponse.json({
+      ok: true,
+      tipo: classificacao.tipo,
+      duracao_min: Math.round(c.duracao_min),
+    });
+  }
+
+  // ── 2. tenta casar com uma sessão de musculação ────────────────────────────
   const dia = dataLocalDe(inicio.toISOString());
   const { data: sessoesDoDia } = await db
     .from("sessoes")
@@ -187,11 +211,12 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  // ── 2. não casou: grava como cardio ────────────────────────────────────────
-  // Serve pro cardio de verdade E como estacionamento pro treino de força cuja
-  // sessão ainda não foi salva — `salvarSessao` absorve depois.
-  const { tipo } = classificarTreinoApple(c.tipo);
-  const { error } = await gravarComoCardio(db, userId, c, inicio, tipo ?? "outro");
+  // ── 3. não casou: estaciona como cardio "outro" ────────────────────────────
+  // O tipo "outro" aqui não é chute: é a marca de "isto pode ser um treino de
+  // academia cuja sessão ainda não foi salva". `salvarSessao` procura
+  // exatamente por cardios "outro" do Apple pra absorver.
+  const tipo = "outro";
+  const { error } = await gravarComoCardio(db, userId, c, inicio, tipo);
 
   if (error) {
     if (error.message.includes("origem_id") || error.message.includes("fc_media")) {
@@ -200,7 +225,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ erro: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, tipo: tipo ?? "outro", duracao_min: Math.round(c.duracao_min) });
+  return NextResponse.json({
+    ok: true,
+    tipo,
+    aguardando_treino: true,
+    duracao_min: Math.round(c.duracao_min),
+  });
 }
 
 /** GET só pra conferir, do navegador, que a rota subiu. Não expõe nada. */
@@ -211,7 +241,7 @@ export async function GET() {
     metodo: "POST",
     autenticacao: "cabeçalho Authorization: Bearer <token>",
     comportamento:
-      "casa com treino do app pelo horário e anexa FC/calorias nele; se não casar, grava como cardio",
+      "tipo reconhecido como cardio vira cardio; o resto casa com o treino do app pelo horário e anexa FC/calorias nele",
     campos: [
       "origem_id (obrigatório)",
       "tipo (obrigatório)",

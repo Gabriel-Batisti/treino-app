@@ -147,6 +147,10 @@ export async function salvarSessao(payload: unknown): Promise<ResultadoAcao> {
       .select("id, origem_id, inicio_em, duracao_min, fc_media, fc_max, calorias")
       .eq("user_id", auth.user.id)
       .eq("fonte", "apple_saude")
+      // Só "outro": é a marca que a rota põe no que PODE ser academia. Sem
+      // este filtro, a bike registrada no relógio no mesmo dia seria absorvida
+      // pela sessão e sumiria da lista de cardios.
+      .eq("tipo", "outro")
       .is("excluido_em", null)
       .eq("data_local", s.data_local);
 

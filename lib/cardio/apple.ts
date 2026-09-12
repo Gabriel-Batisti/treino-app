@@ -43,18 +43,27 @@ const FORCA =
 
 export interface ClassificacaoCardio {
   tipo: TipoCardio | null;
-  /** true quando é treino de força — deve ser ignorado, não rejeitado. */
+  /** true quando é treino de força. */
   ehForca: boolean;
+  /**
+   * true quando o nome casou com uma regra — "Bicicleta", "Esteira", "Corrida".
+   *
+   * É o que separa "eu sei que isto é cardio" de "não faço ideia do que é".
+   * Só o segundo caso pode ser um treino de academia disfarçado, e só ele tenta
+   * casar com uma sessão do app. Sem esta distinção, a bike feita logo antes da
+   * musculação seria anexada à sessão como se fosse ela.
+   */
+  reconhecido: boolean;
 }
 
 export function classificarTreinoApple(nomeDoTipo: string): ClassificacaoCardio {
   const n = normalizarNome(nomeDoTipo);
-  if (!n) return { tipo: "outro", ehForca: false };
-  if (FORCA.test(n)) return { tipo: null, ehForca: true };
+  if (!n) return { tipo: "outro", ehForca: false, reconhecido: false };
+  if (FORCA.test(n)) return { tipo: null, ehForca: true, reconhecido: true };
   for (const [padrao, tipo] of REGRAS) {
-    if (padrao.test(n)) return { tipo, ehForca: false };
+    if (padrao.test(n)) return { tipo, ehForca: false, reconhecido: true };
   }
   // Cardio que não reconheci (HIIT, dança, natação…) entra como "outro" em vez
   // de ser recusado: perder o registro é pior que classificar de forma genérica.
-  return { tipo: "outro", ehForca: false };
+  return { tipo: "outro", ehForca: false, reconhecido: false };
 }
