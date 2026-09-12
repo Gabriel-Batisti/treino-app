@@ -6,6 +6,7 @@ import { enfileirar } from "@/lib/local/db";
 import { sincronizar } from "@/lib/local/sync";
 import { hojeLocal, formatPeso, haQuantoTempo } from "@/lib/format";
 import { e1rm, volume } from "@/lib/treino/calc";
+import { avisarDescansoAcabou, prepararSom, tocarBip } from "@/lib/som";
 import { SeletorExercicio } from "@/components/seletor-exercicio";
 import {
   lerDesempenho,
@@ -150,6 +151,8 @@ export function SessaoAtiva({
   const [retomado, setRetomado] = useState(false);
   /** Só grava rascunho depois de tentar restaurar, senão o vazio sobrescreve. */
   const prontoPraRascunho = useRef(false);
+  /** Último fim de descanso já avisado, pra não apitar em looping. */
+  const avisouRef = useRef<number | null>(null);
   /** Toque em andamento numa linha de série, pro arrastar-pra-excluir. */
   const toqueRef = useRef<{ id: string; x: number; y: number; horizontal: boolean | null } | null>(
     null,
@@ -185,6 +188,21 @@ export function SessaoAtiva({
     // Só no início: depois disso quem manda é o estado local.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /**
+   * Apita quando o descanso zera — uma vez por descanso.
+   *
+   * A marca é o próprio instante do fim: +15 muda o fim e libera um aviso novo,
+   * que é o certo. Sem a marca, o bipe repetiria a cada segundo depois do zero.
+   */
+  useEffect(() => {
+    if (descansoAte == null) return;
+    if (agora < descansoAte) return;
+    if (avisouRef.current === descansoAte) return;
+    avisouRef.current = descansoAte;
+    tocarBip();
+    void avisarDescansoAcabou();
+  }, [agora, descansoAte]);
 
   /** Grava o rascunho a cada alteração. Substituição inteira, é barato. */
   useEffect(() => {
@@ -295,6 +313,9 @@ export function SessaoAtiva({
    * exatamente assim que o descanso parou de disparar no ✓.
    */
   function concluir(exIdx: number, sIdx: number) {
+    // Dentro do gesto: é aqui que o iOS libera o som pro bipe de daqui a dois
+    // minutos. Fora de gesto, ele recusaria em silêncio.
+    prepararSom();
     const exAtual = exercicios[exIdx];
     const serieAtual = exAtual?.series[sIdx];
     const antAtual =

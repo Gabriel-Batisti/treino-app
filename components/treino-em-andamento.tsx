@@ -70,7 +70,13 @@ export function TreinoEmAndamento() {
   const tempo = min < 60 ? `${min} min` : `${Math.floor(min / 60)}h${String(min % 60).padStart(2, "0")}`;
 
   return (
-    <div className="fixed inset-x-0 bottom-[4.5rem] z-30 px-3">
+    // `bottom` fixo em rem cortava a barra: a de abas tem altura mínima MAIS o
+    // respiro da área segura do iPhone, que varia por aparelho. `calc` com a
+    // própria variável do sistema resolve em qualquer tela.
+    <div
+      className="fixed inset-x-0 z-30 px-3"
+      style={{ bottom: "calc(4rem + env(safe-area-inset-bottom) + 0.5rem)" }}
+    >
       <button
         onClick={() => router.push(info.rotinaId ? `/sessao?rotina=${info.rotinaId}` : "/sessao")}
         className="w-full rounded-2xl bg-accent text-black px-4 py-3 flex items-center gap-3 text-left shadow-lg"
