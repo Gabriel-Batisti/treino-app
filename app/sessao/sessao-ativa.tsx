@@ -8,8 +8,11 @@ import { hojeLocal, formatPeso, haQuantoTempo } from "@/lib/format";
 import { e1rm, volume } from "@/lib/treino/calc";
 import { avisarDescansoAcabou, prepararSom, tocarBip } from "@/lib/som";
 import { SeletorExercicio } from "@/components/seletor-exercicio";
+import { normalizarNome } from "@/lib/treino/texto";
+import { sugerirSubstitutos, type CandidatoSubstituto } from "@/lib/treino/substituir";
 import {
   lerDesempenho,
+  lerExercicios,
   salvarRascunho,
   lerRascunho,
   limparRascunho,
@@ -137,6 +140,10 @@ export function SessaoAtiva({
   const [deslize, setDeslize] = useState<{ id: string; dx: number } | null>(null);
   /** Quais exercícios passam a ter o número de séries feito hoje. */
   const [aAjustarSeries, setAAjustarSeries] = useState<Record<string, boolean> | null>(null);
+  /** Exercício aberto no painel de substituição, com os candidatos já prontos. */
+  const [trocando, setTrocando] = useState<
+    { exIdx: number; nome: string; opcoes: CandidatoSubstituto[] } | null
+  >(null);
   const [calorias, setCalorias] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const [agora, setAgora] = useState(() => Date.now());
@@ -356,6 +363,59 @@ export function SessaoAtiva({
       setDescansoTotal(exAtual.descansoSeg);
     }
     navigator.vibrate?.(30);
+  }
+
+  /**
+   * Abre a lista de substitutos pro exercício — o caso "a máquina está ocupada".
+   *
+   * A conta roda AQUI, no aparelho, com o catálogo do IndexedDB: é resposta
+   * determinística (mesmo músculo, outro aparelho, entre os que você já fez) e
+   * precisa sair num toque, sem rede.
+   */
+  async function abrirTroca(exIdx: number) {
+    const ex = exercicios[exIdx];
+    const catalogo = await lerExercicios();
+    const opcoes = sugerirSubstitutos(
+      normalizarNome(ex.nome),
+      ex.nome,
+      catalogo.map((c) => ({ id: c.id, nome: c.nome, nome_busca: c.nomeBusca, usos: c.usos })),
+      exercicios.map((e) => e.exercicioId),
+    );
+    setTrocando({ exIdx, nome: ex.nome, opcoes });
+  }
+
+  /**
+   * Troca o exercício NO LUGAR: mesma posição, mesmo número de séries.
+   *
+   * Os pesos digitados são zerados de propósito — eram do outro exercício, e
+   * herdar 60 kg do supino pro crucifixo seria pior que campo vazio. O
+   * "anterior" do novo exercício entra no lugar, que é o que você precisa ver.
+   */
+  async function trocarExercicio(exIdx: number, novo: CandidatoSubstituto) {
+    const mapa = await lerDesempenho([novo.exercicioId]);
+    const d = mapa.get(novo.exercicioId);
+    setTrocando(null);
+    setExercicios((prev) => {
+      const cp = structuredClone(prev);
+      const ex = cp[exIdx];
+      ex.exercicioId = novo.exercicioId;
+      ex.nome = novo.nome;
+      ex.anterior = d?.series ?? [];
+      ex.anteriorEm = d?.dataLocal ?? null;
+      ex.recordePesoKg = d?.recordePesoKg ?? null;
+      // Entrou no lugar de um da rotina: no fim, o app pergunta se vale sempre.
+      ex.foraDaRotina = true;
+      ex.series = ex.series.map((s, i) => ({
+        ...s,
+        indice: i + 1,
+        pesoKg: null,
+        pesoTexto: undefined,
+        reps: null,
+        concluida: false,
+        registradaEm: null,
+      }));
+      return cp;
+    });
   }
 
   /**
@@ -646,9 +706,20 @@ export function SessaoAtiva({
           <section key={ex.id}>
             <div className="flex items-baseline justify-between gap-2">
               <h2 className="font-medium text-accent">{ex.nome}</h2>
-              {ex.anteriorEm && (
-                <span className="text-[11px] text-muted shrink-0">{haQuantoTempo(ex.anteriorEm)}</span>
-              )}
+              <div className="flex items-baseline gap-2 shrink-0">
+                {ex.anteriorEm && (
+                  <span className="text-[11px] text-muted">{haQuantoTempo(ex.anteriorEm)}</span>
+                )}
+                {/* Aparelho ocupado. Fica no cabeçalho do exercício porque é lá
+                    que você olha quando chega na máquina e ela está em uso. */}
+                <button
+                  onClick={() => void abrirTroca(exIdx)}
+                  aria-label={`substituir ${ex.nome}`}
+                  className="size-8 -mr-1 grid place-items-center rounded-lg text-muted text-sm"
+                >
+                  ⇄
+                </button>
+              </div>
             </div>
 
             <input
@@ -993,6 +1064,57 @@ export function SessaoAtiva({
                 Voltar ao treino
               </button>
             )}
+          </div>
+        </div>
+      )}
+
+      {trocando && (
+        <div className="fixed inset-0 z-50 bg-background flex flex-col pt-safe pb-safe">
+          <header className="px-4 pt-4 pb-3 border-b border-border">
+            <h2 className="text-lg font-medium">Substituir</h2>
+            <p className="mt-0.5 text-xs text-muted truncate">{trocando.nome}</p>
+          </header>
+
+          <div className="flex-1 overflow-y-auto px-4 py-3">
+            {trocando.opcoes.length === 0 ? (
+              <p className="py-10 text-center text-sm text-muted">
+                Não achei substituto entre os exercícios que você já fez.
+                <br />
+                Use &quot;＋ Adicionar exercício&quot; pra escolher outro.
+              </p>
+            ) : (
+              <ul className="flex flex-col gap-2">
+                {trocando.opcoes.map((o) => (
+                  <li key={o.exercicioId}>
+                    <button
+                      onClick={() => void trocarExercicio(trocando.exIdx, o)}
+                      className="w-full rounded-2xl bg-card border border-border p-4 text-left"
+                    >
+                      <span className="block">{o.nome}</span>
+                      {/* O motivo aparece pra você julgar, não obedecer. */}
+                      <span className="block mt-0.5 text-[11px] text-muted">
+                        {o.motivo}
+                        {o.usos > 0 && ` · ${o.usos} ${o.usos === 1 ? "vez" : "vezes"}`}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <p className="mt-4 text-[11px] text-muted">
+              A troca vale só pra hoje. No fim do treino o app pergunta se ela
+              deve entrar na rotina.
+            </p>
+          </div>
+
+          <div className="px-4 pt-2 border-t border-border">
+            <button
+              onClick={() => setTrocando(null)}
+              className="w-full rounded-2xl border border-border py-4 text-sm"
+            >
+              Cancelar
+            </button>
           </div>
         </div>
       )}

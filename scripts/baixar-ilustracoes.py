@@ -134,6 +134,13 @@ def main() -> None:
                 "aprox": aprox,
                 "fonte": deles,
                 "instrucoes": alvo.get("instructions", []),
+                # Metadado que alimenta a sugestão de substituto. Vinha junto
+                # desde sempre e era jogado fora.
+                "musculos": alvo.get("primaryMuscles", []),
+                "secundarios": alvo.get("secondaryMuscles", []),
+                "equipamento": alvo.get("equipment") or None,
+                "forca": alvo.get("force") or None,
+                "mecanica": alvo.get("mechanic") or None,
             }
         )
         print(f"  ✓ {meu}" + ("  (aproximada)" if aprox else ""))
@@ -151,6 +158,11 @@ def main() -> None:
         " *",
         " * `aprox` = mesmo movimento, aparelho diferente. A UI rotula.",
         " * `instrucoes` vêm da base, em INGLÊS — não foram traduzidas.",
+        " *",
+        " * `musculos`, `equipamento`, `forca` e `mecanica` alimentam a sugestão",
+        " * de substituto (lib/treino/substituir.ts). ATENÇÃO: quando `aprox` é",
+        " * true, o `equipamento` é o do exercício da BASE, não o seu — por isso",
+        " * o nome do seu exercício manda na hora de decidir o aparelho.",
         " */",
         "",
         "export interface Ilustracao {",
@@ -161,6 +173,15 @@ def main() -> None:
         "  /** Nome na base de origem, pra rastrear de onde veio. */",
         "  fonte: string;",
         "  instrucoes: string[];",
+        "  /** Músculo(s) principal(is) — em inglês, como vem da base. */",
+        "  musculos: string[];",
+        "  secundarios: string[];",
+        "  /** Não confie quando `aprox` for true — ver cabeçalho. */",
+        "  equipamento: string | null;",
+        "  /** push | pull | static */",
+        "  forca: string | null;",
+        "  /** compound | isolation */",
+        "  mecanica: string | null;",
         "}",
         "",
         "/** Chave = `nome_busca` (ver lib/treino/texto.ts). */",
@@ -168,10 +189,13 @@ def main() -> None:
     ]
     for e in sorted(entradas, key=lambda x: x["chave"]):
         instr = ", ".join(json.dumps(i, ensure_ascii=False) for i in e["instrucoes"])
+        j = lambda v: json.dumps(v, ensure_ascii=False)
         linhas.append(
-            f'  {json.dumps(e["chave"], ensure_ascii=False)}: '
-            f'{{ pasta: {json.dumps(e["pasta"])}, aprox: {str(e["aprox"]).lower()}, '
-            f'fonte: {json.dumps(e["fonte"], ensure_ascii=False)}, instrucoes: [{instr}] }},'
+            f'  {j(e["chave"])}: {{ pasta: {j(e["pasta"])}, '
+            f'aprox: {str(e["aprox"]).lower()}, fonte: {j(e["fonte"])}, '
+            f'musculos: {j(e["musculos"])}, secundarios: {j(e["secundarios"])}, '
+            f'equipamento: {j(e["equipamento"])}, forca: {j(e["forca"])}, '
+            f'mecanica: {j(e["mecanica"])}, instrucoes: [{instr}] }},'
         )
     linhas += [
         "};",
