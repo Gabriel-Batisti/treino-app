@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { formatData } from "@/lib/format";
+import { LembreteDiario } from "./lembrete-diario";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +45,8 @@ export default async function Perfil() {
           </div>
         ))}
       </div>
+
+      <LembreteDiario />
 
       <nav className="mt-6 flex flex-col rounded-2xl bg-card border border-border divide-y divide-border">
         <Link href="/peso" className="px-4 py-4 flex items-center justify-between">

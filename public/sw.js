@@ -103,3 +103,52 @@ self.addEventListener("fetch", (evento) => {
     );
   }
 });
+
+/*
+ * ── Notificação ────────────────────────────────────────────────────────────
+ *
+ * No iOS, Web Push SÓ funciona com o app instalado na tela de início — no
+ * Safari comum, `Notification` nem existe. Por isso a tela de perfil checa
+ * `display-mode: standalone` antes de oferecer o botão.
+ *
+ * O evento `push` tem que responder MESMO com corpo vazio ou ilegível: um
+ * push sem notificação visível faz o iOS revogar a inscrição depois de
+ * algumas ocorrências.
+ */
+self.addEventListener("push", (evento) => {
+  let dado = {};
+  try {
+    dado = evento.data ? evento.data.json() : {};
+  } catch {
+    /* corpo não-JSON: cai no texto padrão */
+  }
+  const titulo = dado.titulo || "Treino";
+  evento.waitUntil(
+    self.registration.showNotification(titulo, {
+      body: dado.corpo || "Hora de registrar o peso.",
+      icon: "/icon-192.png",
+      badge: "/icon-192.png",
+      tag: dado.tag || "lembrete",
+      data: { url: dado.url || "/peso" },
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", (evento) => {
+  evento.notification.close();
+  const destino = evento.notification.data?.url || "/peso";
+  evento.waitUntil(
+    (async () => {
+      const abas = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      // Se o app já está aberto, navega a aba existente em vez de abrir outra.
+      for (const aba of abas) {
+        if ("focus" in aba) {
+          await aba.focus();
+          if ("navigate" in aba) await aba.navigate(destino);
+          return;
+        }
+      }
+      await self.clients.openWindow(destino);
+    })(),
+  );
+});
