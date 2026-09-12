@@ -46,6 +46,39 @@ export default async function TreinoPage({ params }: PageProps<"/sessoes/[id]">)
   const todas = exs.flatMap((e) => (e.series ?? []).filter((s) => s.concluida));
   const volume = Math.round(todas.reduce((n, s) => n + Number(s.volume_kg ?? 0), 0));
 
+  // RECORDES DESTE TREINO. Mesmo critério da timeline, de propósito: o mesmo
+  // número não pode significar duas coisas em duas telas. "Recorde" é conter a
+  // melhor marca de PESO do exercício em todo o histórico — peso é fato, e1RM
+  // seria estimativa (D-004).
+  //
+  // A view pode não existir (0002 não rodada): o card some, a tela não quebra.
+  const idsDoTreino = exs.map((e) => e.exercicios?.id).filter((x): x is string => !!x);
+  const { data: recordesData } = idsDoTreino.length
+    ? await supabase
+        .from("vw_recorde_exercicio")
+        .select("exercicio_id, melhor_peso")
+        .in("exercicio_id", idsDoTreino)
+        .then((r) => r, () => ({ data: null }))
+    : { data: null };
+
+  const melhorPorExercicio = new Map(
+    ((recordesData ?? []) as { exercicio_id: string | null; melhor_peso: number | null }[])
+      .filter((r) => r.exercicio_id)
+      .map((r) => [r.exercicio_id!, Number(r.melhor_peso ?? 0)]),
+  );
+
+  const comRecorde = exs.filter((e) => {
+    const melhor = e.exercicios ? melhorPorExercicio.get(e.exercicios.id) : undefined;
+    if (melhor == null) return false;
+    const maxAqui = Math.max(
+      0,
+      ...(e.series ?? []).filter((x) => x.concluida).map((x) => Number(x.peso_kg ?? 0)),
+    );
+    return maxAqui >= melhor;
+  });
+  const qtdRecordes = comRecorde.length;
+  const ehRecorde = new Set(comRecorde.map((e) => `${e.ordem}-${e.nome_snapshot}`));
+
   return (
     <main className="flex-1 flex flex-col pb-safe">
       <header className="pt-safe sticky top-0 z-30 bg-background/95 backdrop-blur border-b border-border">
@@ -73,6 +106,9 @@ export default async function TreinoPage({ params }: PageProps<"/sessoes/[id]">)
             ["Tempo", sessao.duracao_seg ? `${Math.round(sessao.duracao_seg / 60)} min` : "—"],
             ["Volume", `${volume.toLocaleString("pt-BR")} kg`],
             ["Séries", String(todas.length)],
+            ...(qtdRecordes > 0
+              ? ([["Recordes", `🏅 ${qtdRecordes}`]] as [string, string][])
+              : []),
             // Só aparecem quando o Apple Watch mandou.
             ...(sessao.fc_media != null
               ? ([["FC média", `${sessao.fc_media} bpm`]] as [string, string][])
@@ -97,6 +133,13 @@ export default async function TreinoPage({ params }: PageProps<"/sessoes/[id]">)
           <div key={`${e.ordem}-${e.nome_snapshot}`}>
             <div className="flex items-center gap-3">
               <Ilustracao nomeBusca={e.exercicios?.nome_busca ?? ""} className="size-10" />
+              {/* A medalha ao lado do nome é o que torna o número do card
+                  acionável: "3 recordes" sem dizer QUAIS não serve pra nada. */}
+              {ehRecorde.has(`${e.ordem}-${e.nome_snapshot}`) && (
+                <span title="melhor carga deste exercício" aria-label="recorde">
+                  🏅
+                </span>
+              )}
               {e.exercicios ? (
                 <Link href={`/exercicios/${e.exercicios.id}`} className="text-accent">
                   {e.nome_snapshot}
