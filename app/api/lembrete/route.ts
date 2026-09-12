@@ -31,7 +31,16 @@ export async function GET(request: NextRequest) {
   // A Vercel manda `Authorization: Bearer $CRON_SECRET` quando a variável
   // existe. Sem o segredo, qualquer um dispararia notificação no meu celular.
   const segredo = process.env.CRON_SECRET;
-  if (!segredo || request.headers.get("authorization") !== `Bearer ${segredo}`) {
+
+  // Recurso ainda não configurado: responde OK e não faz NADA. Sem isto o cron
+  // diário marcaria erro vermelho todo dia no painel por um recurso que a
+  // pessoa ainda nem ligou — e log com falha crônica é log que ninguém lê.
+  // Não é buraco de segurança: sem segredo, nada é enviado.
+  if (!segredo) {
+    return NextResponse.json({ ok: true, enviados: 0, motivo: "lembrete não configurado" });
+  }
+
+  if (request.headers.get("authorization") !== `Bearer ${segredo}`) {
     return NextResponse.json({ erro: "não autorizado" }, { status: 401 });
   }
 
