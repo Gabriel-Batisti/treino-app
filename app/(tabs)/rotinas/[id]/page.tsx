@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { formatData } from "@/lib/format";
 import { GraficoRotina, type PontoSessao } from "./grafico-rotina";
 import { ExercicioRotina, type LinhaSerieAlvo } from "./exercicio-rotina";
-import type { UltimoDesempenho } from "@/types/database";
+import type { UltimoDesempenho } from "@/types/app";
 
 export const dynamic = "force-dynamic";
 

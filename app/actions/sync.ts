@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import type { UltimoDesempenho } from "@/types/database";
+import type { UltimoDesempenho } from "@/types/app";
 
 /**
  * Payload que abastece o banco local (D-007).

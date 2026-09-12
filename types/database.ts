@@ -1,16 +1,13 @@
 /**
- * Tipos do schema — GERADO, não editar à mão.
+ * Tipos do schema — GERADO por:
  *
  *   npx supabase gen types typescript --project-id <ref> > types/database.ts
  *
- * Regerar SEMPRE depois de rodar uma migration nova. Os apelidos no fim do
- * arquivo derivam daqui, então uma coluna que muda de tipo quebra no tsc em
- * vez de quebrar em produção.
+ * NÃO EDITAR, e não pôr nada aqui dentro: o comando sobrescreve o arquivo
+ * inteiro. Apelidos e `Omit` de coluna gerada ficam em `types/app.ts`.
  *
- * ⚠️ O gerador da Supabase NÃO exclui coluna gerada do `Insert`: `series.Insert`
- * vem com `e1rm?` e `volume_kg?`, que o Postgres recusa em tempo de execução.
- * Por isso os apelidos no fim do arquivo fazem o `Omit` à mão — é lá que a
- * proteção do D-003 realmente existe. Não use `Tables["series"]["Insert"]` cru.
+ * Regerar SEMPRE depois de rodar uma migration nova — assim uma coluna que
+ * muda de tipo quebra no tsc em vez de quebrar em produção.
  */
 
 export type Json =
@@ -38,11 +35,15 @@ export type Database = {
           distancia_km: number | null
           duracao_min: number
           excluido_em: string | null
+          fc_max: number | null
+          fc_media: number | null
+          fonte: string
           id: string
           inicio_em: string
           intensidade: string | null
           kcal_por_min: number | null
           notas: string | null
+          origem_id: string | null
           tipo: string
           user_id: string
         }
@@ -54,11 +55,15 @@ export type Database = {
           distancia_km?: number | null
           duracao_min: number
           excluido_em?: string | null
+          fc_max?: number | null
+          fc_media?: number | null
+          fonte?: string
           id: string
           inicio_em: string
           intensidade?: string | null
           kcal_por_min?: number | null
           notas?: string | null
+          origem_id?: string | null
           tipo: string
           user_id?: string
         }
@@ -70,11 +75,15 @@ export type Database = {
           distancia_km?: number | null
           duracao_min?: number
           excluido_em?: string | null
+          fc_max?: number | null
+          fc_media?: number | null
+          fonte?: string
           id?: string
           inicio_em?: string
           intensidade?: string | null
           kcal_por_min?: number | null
           notas?: string | null
+          origem_id?: string | null
           tipo?: string
           user_id?: string
         }
@@ -481,10 +490,14 @@ export type Database = {
       }
       sessoes: {
         Row: {
+          apple_origem_id: string | null
           atualizado_em: string
+          calorias: number | null
           criado_em: string
           data_local: string
           duracao_seg: number | null
+          fc_max: number | null
+          fc_media: number | null
           fim_em: string | null
           id: string
           inicio_em: string
@@ -498,10 +511,14 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          apple_origem_id?: string | null
           atualizado_em?: string
+          calorias?: number | null
           criado_em?: string
           data_local: string
           duracao_seg?: number | null
+          fc_max?: number | null
+          fc_media?: number | null
           fim_em?: string | null
           id: string
           inicio_em: string
@@ -515,10 +532,14 @@ export type Database = {
           user_id?: string
         }
         Update: {
+          apple_origem_id?: string | null
           atualizado_em?: string
+          calorias?: number | null
           criado_em?: string
           data_local?: string
           duracao_seg?: number | null
+          fc_max?: number | null
+          fc_media?: number | null
           fim_em?: string | null
           id?: string
           inicio_em?: string
@@ -725,42 +746,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Apelidos usados pelo app. Derivados do schema acima — nunca redigitados.
-// ─────────────────────────────────────────────────────────────────────────────
-
-type Tabelas = Database["public"]["Tables"];
-type Views = Database["public"]["Views"];
-
-export type Exercicio = Tabelas["exercicios"]["Row"];
-export type ExercicioInsert = Tabelas["exercicios"]["Insert"];
-export type Rotina = Tabelas["rotinas"]["Row"];
-export type RotinaExercicio = Tabelas["rotina_exercicios"]["Row"];
-export type Sessao = Tabelas["sessoes"]["Row"];
-/** Sem `duracao_seg`: é coluna gerada, o Postgres recusa no insert (D-003). */
-export type SessaoInsert = Omit<Tabelas["sessoes"]["Insert"], "duracao_seg">;
-export type SessaoExercicio = Tabelas["sessao_exercicios"]["Row"];
-export type SessaoExercicioInsert = Tabelas["sessao_exercicios"]["Insert"];
-export type Serie = Tabelas["series"]["Row"];
-export type Cardio = Tabelas["cardios"]["Row"];
-export type Medida = Tabelas["medidas"]["Row"];
-/** Sem `massa_gorda_kg`: é coluna gerada (D-003). */
-export type MedidaInsert = Omit<Tabelas["medidas"]["Insert"], "massa_gorda_kg">;
-export type Foto = Tabelas["fotos"]["Row"];
-export type FotoInsert = Tabelas["fotos"]["Insert"];
-/** Sem `kcal_por_min`: é coluna gerada (D-003). */
-export type CardioInsert = Omit<Tabelas["cardios"]["Insert"], "kcal_por_min">;
-/** Sem `volume_kg` nem `e1rm`: são colunas geradas (D-003). */
-export type SerieInsert = Omit<Tabelas["series"]["Insert"], "volume_kg" | "e1rm">;
-
-/** Uma linha da view do "anterior" (D-005). */
-export type UltimoDesempenho = Views["vw_ultimo_desempenho"]["Row"];
-
-/** Melhor marca por exercício — alimenta a contagem de recordes na timeline. */
-export type RecordeExercicio = Views["vw_recorde_exercicio"]["Row"];
-
-export type ModoMedicao = "peso_reps" | "peso_corporal_reps" | "tempo" | "distancia";
-export type TipoSerie = "normal" | "aquecimento" | "drop" | "falha" | "backoff";
-export type StatusSessao = "em_andamento" | "concluida" | "abandonada";
-export type OrigemSessao = "app" | "importado_heavy";
