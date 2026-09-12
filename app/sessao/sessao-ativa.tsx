@@ -117,6 +117,10 @@ export function SessaoAtiva({
     exerciciosIniciais.map(montarExercicio),
   );
   const [salvando, setSalvando] = useState(false);
+  // Painel do fim do treino: métricas do relógio e, se for o caso, a rotina.
+  const [painelFim, setPainelFim] = useState(false);
+  const [fcMedia, setFcMedia] = useState("");
+  const [calorias, setCalorias] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const [agora, setAgora] = useState(() => Date.now());
   /** Timestamp em que o descanso acaba. Guardo o FIM, não o restante. */
@@ -332,10 +336,17 @@ export function SessaoAtiva({
       setAAdicionarNaRotina(
         Object.fromEntries(extrasDaRotina().map((e) => [e.exercicioId, true])),
       );
-      return;
     }
-    void finalizar();
+    setPainelFim(true);
   }
+
+  /** Campo vazio vira null — não registrar é resposta válida. */
+  const numero = (t: string): number | null => {
+    const v = t.trim().replace(",", ".");
+    if (!v) return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? Math.round(n) : null;
+  };
 
   /**
    * `inclusoes` vem por ARGUMENTO, não do estado: "Não mudar a rotina" chama
@@ -354,6 +365,10 @@ export function SessaoAtiva({
       fim_em: new Date().toISOString(),
       data_local: hojeLocal(),
       notas: null,
+      // Lidos no relógio e digitados aqui. O Atalhos do iOS não entrega treino
+      // (D-021), então este é o caminho — dois campos, uma vez por treino.
+      fc_media: numero(fcMedia),
+      calorias: numero(calorias),
       exercicios: exercicios.map((e, i) => ({
         id: e.id,
         exercicio_id: e.exercicioId,
@@ -577,11 +592,55 @@ export function SessaoAtiva({
         )}
       </div>
 
-      {/* Pergunta do "Concluir": o que foi feito hoje fora da rotina entra nela? */}
-      {aAdicionarNaRotina !== null && (
+      {/* Fim do treino: métricas do relógio e, se houver, a pergunta da rotina. */}
+      {painelFim && (
         <div className="fixed inset-0 z-50 bg-background flex flex-col pt-safe pb-safe">
           <div className="flex-1 overflow-y-auto px-4 pt-8">
-            <h2 className="text-xl font-semibold tracking-tight">Atualizar a rotina?</h2>
+            <h2 className="text-xl font-semibold tracking-tight">Treino concluído</h2>
+            <p className="mt-2 text-sm text-muted">
+              {feitas} {feitas === 1 ? "série" : "séries"} em {mmss(decorrido)}.
+            </p>
+
+            <section className="mt-5">
+              <h3 className="text-[10px] uppercase tracking-wide text-muted">
+                Do relógio — opcional
+              </h3>
+              <div className="mt-2 grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] text-muted" htmlFor="fc-media">
+                    Batimentos médios
+                  </label>
+                  <input
+                    id="fc-media"
+                    inputMode="numeric"
+                    placeholder="bpm"
+                    value={fcMedia}
+                    onChange={(e) => setFcMedia(e.target.value)}
+                    className="mt-1 w-full rounded-xl bg-card border border-border px-3 py-4 text-center text-lg tabular-nums outline-none focus:border-accent"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-muted" htmlFor="calorias">
+                    Calorias
+                  </label>
+                  <input
+                    id="calorias"
+                    inputMode="numeric"
+                    placeholder="kcal"
+                    value={calorias}
+                    onChange={(e) => setCalorias(e.target.value)}
+                    className="mt-1 w-full rounded-xl bg-card border border-border px-3 py-4 text-center text-lg tabular-nums outline-none focus:border-accent"
+                  />
+                </div>
+              </div>
+              <p className="mt-1.5 text-[11px] text-muted">
+                Está no resumo do treino no relógio. Em branco também está bom.
+              </p>
+            </section>
+
+            {aAdicionarNaRotina !== null && (
+            <>
+            <h2 className="mt-8 text-xl font-semibold tracking-tight">Atualizar a rotina?</h2>
             <p className="mt-2 text-sm text-muted">
               {extrasDaRotina().length === 1 ? "Este exercício não estava" : "Estes exercícios não estavam"}{" "}
               em <span className="text-foreground">{nomeRotina}</span>. Marque o que deve passar a
@@ -630,6 +689,8 @@ export function SessaoAtiva({
               O que você desmarcar continua salvo no treino de hoje — só não entra
               na rotina.
             </p>
+            </>
+            )}
           </div>
 
           <div className="px-4 pt-2 border-t border-border flex flex-col gap-2">
@@ -638,17 +699,27 @@ export function SessaoAtiva({
               disabled={salvando}
               className="w-full rounded-2xl bg-accent text-black font-semibold py-5 text-base disabled:opacity-40"
             >
-              {salvando ? "salvando…" : "Concluir treino"}
+              {salvando ? "salvando…" : "Salvar treino"}
             </button>
-            <button
-              // Passa {} direto: depender do setState acima faria a closure
-              // ver o valor antigo e adicionar o que você acabou de recusar.
-              onClick={() => void finalizar({})}
-              disabled={salvando}
-              className="w-full py-3 text-center text-sm text-muted"
-            >
-              Não mudar a rotina
-            </button>
+            {aAdicionarNaRotina !== null ? (
+              <button
+                // Passa {} direto: depender do setState acima faria a closure
+                // ver o valor antigo e adicionar o que você acabou de recusar.
+                onClick={() => void finalizar({})}
+                disabled={salvando}
+                className="w-full py-3 text-center text-sm text-muted"
+              >
+                Salvar sem mudar a rotina
+              </button>
+            ) : (
+              <button
+                onClick={() => setPainelFim(false)}
+                disabled={salvando}
+                className="w-full py-3 text-center text-sm text-muted"
+              >
+                Voltar ao treino
+              </button>
+            )}
           </div>
         </div>
       )}

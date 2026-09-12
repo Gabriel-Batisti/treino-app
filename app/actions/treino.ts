@@ -45,6 +45,13 @@ const sessaoSchema = z.object({
   // Vem do RELÓGIO DO CELULAR, não de now() no servidor (D-012).
   data_local: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   notas: z.string().nullable(),
+  /**
+   * Digitados no fim do treino, lidos no relógio (D-021: o Atalhos do iOS não
+   * entrega treino, então este é o caminho). Opcionais: treino sem relógio é
+   * treino igual.
+   */
+  fc_media: z.number().int().min(20).max(260).nullish(),
+  calorias: z.number().int().min(0).max(5000).nullish(),
   exercicios: z.array(exercicioSchema),
 });
 
@@ -84,6 +91,8 @@ export async function salvarSessao(payload: unknown): Promise<ResultadoAcao> {
     status: "concluida",
     origem: "app",
     notas: s.notas,
+    fc_media: s.fc_media ?? null,
+    calorias: s.calorias ?? null,
     sincronizado_em: new Date().toISOString(),
   });
   if (e1) return { ok: false, error: e1.message };
@@ -141,7 +150,17 @@ export async function salvarSessao(payload: unknown): Promise<ResultadoAcao> {
   // e estacionou o treino como cardio. Agora que a sessão existe, ela reivindica.
   //
   // Falhar aqui não pode derrubar o salvamento do treino — é enfeite, não dado.
+  // Número digitado à mão MANDA: se você leu do relógio e digitou, não é o
+  // casamento automático que vai sobrescrever.
+  const jaTemMetricas = s.fc_media != null || s.calorias != null;
+
   try {
+    if (jaTemMetricas) {
+      revalidatePath("/");
+      revalidatePath("/exercicios");
+      return { ok: true, data: null };
+    }
+
     const { data: candidatos } = await supabase
       .from("cardios")
       .select("id, origem_id, inicio_em, duracao_min, fc_media, fc_max, calorias")
