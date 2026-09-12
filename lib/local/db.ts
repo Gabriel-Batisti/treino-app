@@ -55,6 +55,15 @@ export interface ExercicioLocal {
 export interface DesempenhoLocal {
   exercicioId: string;
   dataLocal: string;
+  /**
+   * Maior peso já levantado neste exercício, de todo o histórico.
+   *
+   * Vem junto do "anterior" e não numa store própria: os dois são lidos no
+   * mesmo instante, pela mesma tela, e separá-los criaria duas leituras onde
+   * uma basta. Campo novo em objeto já gravado não exige subir a versão do
+   * IndexedDB — registro antigo simplesmente vem sem ele.
+   */
+  recordePesoKg?: number | null;
   series: { indice: number; pesoKg: number | null; reps: number | null; e1rm: number | null }[];
 }
 

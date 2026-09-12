@@ -129,6 +129,22 @@ export async function puxarDadosLocais(): Promise<
     ? await supabase.from("vw_ultimo_desempenho").select("*").in("exercicio_id", ids)
     : { data: [] as UltimoDesempenho[] };
 
+  // Recorde de carga, pra tela de treino saber na hora que a série bateu um.
+  // A view pode não existir (0002 não rodada) — a tela não pode quebrar por isso.
+  const { data: recordes } = ids.length
+    ? await supabase
+        .from("vw_recorde_exercicio")
+        .select("exercicio_id, melhor_peso")
+        .in("exercicio_id", ids)
+        .then((r) => r, () => ({ data: null }))
+    : { data: null };
+
+  const melhorPeso = new Map<string, number | null>(
+    ((recordes ?? []) as { exercicio_id: string | null; melhor_peso: number | null }[])
+      .filter((r) => r.exercicio_id)
+      .map((r) => [r.exercicio_id!, r.melhor_peso]),
+  );
+
   // View não carrega NOT NULL: toda coluna vem anulável no tipo gerado.
   const porExercicio = new Map<string, UltimoDesempenho[]>();
   for (const a of (anteriores ?? []) as UltimoDesempenho[]) {
@@ -141,6 +157,7 @@ export async function puxarDadosLocais(): Promise<
     return {
       exercicioId,
       dataLocal: ord[0]?.data_local ?? "",
+      recordePesoKg: melhorPeso.get(exercicioId) ?? null,
       series: ord.map((a) => ({
         indice: a.indice ?? 0,
         pesoKg: a.peso_kg,

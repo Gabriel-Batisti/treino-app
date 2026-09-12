@@ -52,6 +52,7 @@ export function SessaoCliente() {
             descansoSeg: e.descansoSeg,
             anterior: d?.series ?? [],
             anteriorEm: d?.dataLocal ?? null,
+            recordePesoKg: d?.recordePesoKg ?? null,
           };
         }),
       });

@@ -42,6 +42,8 @@ export interface ExercicioDaSessao {
   descansoSeg: number | null;
   anterior: SerieAnterior[];
   anteriorEm: string | null;
+  /** Maior carga já feita neste exercício. Null = sem histórico ou sem a 0002. */
+  recordePesoKg: number | null;
 }
 
 interface SerieEmAndamento {
@@ -125,6 +127,8 @@ export function SessaoAtiva({
   const [agora, setAgora] = useState(() => Date.now());
   /** Timestamp em que o descanso acaba. Guardo o FIM, não o restante. */
   const [descansoAte, setDescansoAte] = useState<number | null>(null);
+  /** Duração cheia do descanso atual, só pra desenhar a barra de progresso. */
+  const [descansoTotal, setDescansoTotal] = useState(0);
   const [seletorAberto, setSeletorAberto] = useState(false);
   /** null = não perguntou ainda. Mapa exercicioId -> incluir na rotina. */
   const [aAdicionarNaRotina, setAAdicionarNaRotina] = useState<Record<string, boolean> | null>(null);
@@ -271,8 +275,15 @@ export function SessaoAtiva({
 
     if (vaiConcluir && exAtual.descansoSeg) {
       setDescansoAte(Date.now() + exAtual.descansoSeg * 1000);
+      setDescansoTotal(exAtual.descansoSeg);
     }
     navigator.vibrate?.(30);
+  }
+
+  /** −15 / +15 no descanso. Nunca deixa o fim ficar no passado por engano. */
+  function ajustarDescanso(seg: number) {
+    setDescansoAte((ate) => (ate == null ? ate : Math.max(Date.now(), ate + seg * 1000)));
+    setDescansoTotal((t) => Math.max(15, t + seg));
   }
 
   /**
@@ -291,6 +302,7 @@ export function SessaoAtiva({
     const d = mapa.get(e.id);
     const anterior = d?.series ?? [];
     const quantasSeries = Math.max(anterior.length, 3);
+    const recordePesoKg = d?.recordePesoKg ?? null;
 
     setExercicios((prev) => [
       ...prev,
@@ -298,6 +310,7 @@ export function SessaoAtiva({
         exercicioId: e.id,
         nome: e.nome,
         modoMedicao: e.modoMedicao,
+        recordePesoKg,
         seriesAlvo: quantasSeries,
         repsAlvoMin: null,
         repsAlvoMax: null,
@@ -530,12 +543,28 @@ export function SessaoAtiva({
                 const ant = ex.anterior[sIdx];
                 const est = e1rm(s.pesoKg, s.reps);
                 const bateu = ant?.e1rm != null && est != null && est > ant.e1rm;
+                // RECORDE é contra o histórico inteiro, não contra a última
+                // sessão: superar o treino passado é rotina, superar tudo o que
+                // você já levantou é o que merece medalha.
+                const recorde =
+                  s.concluida &&
+                  s.pesoKg != null &&
+                  ex.recordePesoKg != null &&
+                  s.pesoKg > ex.recordePesoKg;
                 return (
                   <div
                     key={s.id}
-                    className="grid grid-cols-[1.6rem_4.2rem_1fr_1fr_2.75rem] gap-2 items-center"
+                    className={`grid grid-cols-[1.6rem_4.2rem_1fr_1fr_2.75rem] gap-2 items-center rounded-lg ${
+                      s.concluida
+                        ? recorde
+                          ? "bg-amber-400/15 -mx-1 px-1"
+                          : "bg-accent/10 -mx-1 px-1"
+                        : ""
+                    }`}
                   >
-                    <span className="text-center text-xs text-muted tabular-nums">{s.indice}</span>
+                    <span className="text-center text-xs text-muted tabular-nums">
+                      {recorde ? <span aria-label="recorde">🏅</span> : s.indice}
+                    </span>
 
                     {/* O "anterior" — a informação mais importante da tela. */}
                     <span className="text-[11px] text-muted tabular-nums">
@@ -579,9 +608,9 @@ export function SessaoAtiva({
                       aria-label={s.concluida ? "desmarcar série" : "concluir série"}
                       className={`size-11 shrink-0 rounded-lg border text-lg ${
                         s.concluida
-                          ? bateu
-                            ? "bg-accent text-black border-accent"
-                            : "bg-foreground text-black border-foreground"
+                          ? recorde || bateu
+                            ? "bg-accent text-black border-accent font-bold"
+                            : "bg-accent/80 text-black border-accent/80"
                           : "bg-card border-border text-muted"
                       }`}
                     >
@@ -780,22 +809,49 @@ export function SessaoAtiva({
 
       {erro && <p className="px-4 pb-2 text-sm text-red-400">{erro}</p>}
 
-      {/* Timer de descanso, na zona do polegar. Aparece só quando está correndo. */}
+      {/* Descanso, na zona do polegar. O número é o maior elemento da tela
+          enquanto corre: é ele que você olha de longe, apoiado no aparelho. */}
       {restante !== null && restante > -3 && (
-        <div className="sticky bottom-0 px-4 pt-2 pb-safe bg-background/95 backdrop-blur border-t border-border">
-          <div className="flex items-center gap-3 rounded-2xl bg-card border border-border px-4 py-3">
-            <span className="text-xs text-muted">Descanso</span>
-            <span
-              className={`text-2xl tabular-nums font-medium ${restante <= 0 ? "text-accent" : ""}`}
+        <div className="sticky bottom-0 pb-safe bg-background/95 backdrop-blur border-t border-border">
+          {/* Barra do que já passou. `descansoTotal` guarda a duração cheia
+              porque +15 muda o fim e a barra precisa de uma referência. */}
+          <div className="h-1 w-full bg-border">
+            <div
+              className="h-full bg-accent transition-[width] duration-1000 ease-linear"
+              style={{
+                width: `${Math.max(0, Math.min(100, (1 - restante / Math.max(descansoTotal, 1)) * 100))}%`,
+              }}
+            />
+          </div>
+
+          <div className="px-4 pt-2 pb-2">
+            <p
+              className={`text-center text-5xl tabular-nums font-medium ${
+                restante <= 0 ? "text-accent" : ""
+              }`}
             >
               {restante <= 0 ? "acabou" : mmss(restante)}
-            </span>
-            <button
-              onClick={() => setDescansoAte(null)}
-              className="ml-auto text-xs text-muted px-3 py-2"
-            >
-              pular
-            </button>
+            </p>
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              <button
+                onClick={() => ajustarDescanso(-15)}
+                className="rounded-xl bg-card border border-border py-3.5 text-sm tabular-nums"
+              >
+                −15
+              </button>
+              <button
+                onClick={() => ajustarDescanso(15)}
+                className="rounded-xl bg-card border border-border py-3.5 text-sm tabular-nums"
+              >
+                +15
+              </button>
+              <button
+                onClick={() => setDescansoAte(null)}
+                className="rounded-xl bg-accent text-black font-medium py-3.5 text-sm"
+              >
+                Pular
+              </button>
+            </div>
           </div>
         </div>
       )}
