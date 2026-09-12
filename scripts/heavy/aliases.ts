@@ -46,6 +46,29 @@ export const ALIASES: Record<string, string> = {
   // Máquina: 40-45 kg, bate com "Abdominal (Máquina)" (30-55). O "Decline
   // Crunch" é sem carga nenhuma, banco declinado — fica fora.
   "Crunch (Machine)": "Abdominal (Máquina)",
+
+  // ── traduzidos em 12/09/2026 (scripts/traduzir-nomes.ts) ──────────────
+  // Estes NÃO eram alias: eram os próprios nomes canônicos, herdados do
+  // período em que o Heavy estava em inglês. Viraram alias quando o
+  // catálogo foi traduzido — sem isto, reimportar o CSV recria cada um
+  // como exercício novo e parte o histórico em dois.
+  "Decline Crunch": "Abdominal Declinado",
+  "Triceps Rope Pushdown": "Tríceps Corda (Polia)",
+  "Incline Bench Press (Dumbbell)": "Supino Inclinado (Halter)",
+  "Bicep Curl (Dumbbell)": "Rosca Direta (Halter)",
+  "Bicep Curl (Machine)": "Rosca Direta (Máquina)",
+  "Front Raise (Dumbbell)": "Elevação Frontal (Halter)",
+  "Preacher Curl (Barbell)": "Rosca Scott (Barra)",
+  "Skullcrusher (Dumbbell)": "Tríceps Testa (Halter)",
+  "Bench Press (Barbell)": "Supino Reto (Barra)",
+  "Dumbbell Row": "Remada Unilateral (Halter)",
+  "Overhead Press (Dumbbell)": "Desenvolvimento (Halter)",
+  "Overhead Press (Barbell)": "Desenvolvimento Militar (Barra)",
+  "Deadlift (Barbell)": "Levantamento Terra (Barra)",
+  "Seated Cable Row - Bar Wide Grip": "Remada Sentada Pegada Aberta (Cabo)",
+  "Meadows Rows (Barbell)": "Remada Meadows (Barra)",
+  "Overhead Triceps Extension (Cable)": "Tríceps Francês (Polia)",
+  "stiff barra": "Stiff (Barra)",
 };
 
 /**
