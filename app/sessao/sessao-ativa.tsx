@@ -231,9 +231,26 @@ export function SessaoAtiva({
     [],
   );
 
-  /** ✓ com os campos vazios commita o anterior inteiro — o "fiz igual" num toque. */
+  /**
+   * ✓ com os campos vazios commita o anterior inteiro — o "fiz igual" num toque.
+   *
+   * A DECISÃO DE COMEÇAR O DESCANSO É TOMADA AQUI FORA, antes do setState. O
+   * corpo do updater roda depois, durante o render: variável atribuída lá
+   * dentro ainda está com o valor velho na linha seguinte a esta função. Foi
+   * exatamente assim que o descanso parou de disparar no ✓.
+   */
   function concluir(exIdx: number, sIdx: number) {
-    let iniciarDescanso: number | null = null;
+    const exAtual = exercicios[exIdx];
+    const serieAtual = exAtual?.series[sIdx];
+    const antAtual =
+      exAtual?.anterior[sIdx] ?? exAtual?.anterior[exAtual.anterior.length - 1];
+    // Só conta como concluir se ela estava aberta E vai ter repetição — é a
+    // mesma condição que o updater aplica lá embaixo.
+    const vaiConcluir =
+      !!serieAtual &&
+      !serieAtual.concluida &&
+      (serieAtual.reps ?? antAtual?.reps) != null;
+
     setExercicios((prev) => {
       const cp = structuredClone(prev);
       const ex = cp[exIdx];
@@ -249,10 +266,12 @@ export function SessaoAtiva({
       if (s.reps == null) return cp; // sem reps não há série
       s.concluida = true;
       s.registradaEm = new Date().toISOString();
-      iniciarDescanso = ex.descansoSeg ?? null;
       return cp;
     });
-    if (iniciarDescanso) setDescansoAte(Date.now() + iniciarDescanso * 1000);
+
+    if (vaiConcluir && exAtual.descansoSeg) {
+      setDescansoAte(Date.now() + exAtual.descansoSeg * 1000);
+    }
     navigator.vibrate?.(30);
   }
 
