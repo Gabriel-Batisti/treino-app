@@ -241,3 +241,26 @@ Cron da Vercel → `/api/lembrete` → Web Push. **Não notifica quem já regist
 **Custo aceito conscientemente.** A alternativa gratuita e exata existe — `pg_cron` no Supabase chamando a mesma rota — e foi recusada: para lembrete matinal de pesagem, ±1h não muda nada, e não vale uma migration + o segredo guardado no banco. Se um dia a precisão importar, o caminho é esse, não o plano Pro.
 
 No iOS, Web Push **exige o app instalado na tela de início** — no Safari a API nem existe. O botão do Perfil trata isso como estado próprio, não como erro.
+
+---
+
+## D-021 — O Atalhos do iOS não lê treino do Apple Saúde. Verificado, não deduzido.
+**12/09/2026**
+
+Gastamos uma tarde nisso; fica registrado pra ninguém tentar de novo.
+
+**As três portas, todas fechadas** (iOS 26.3.1, iPhone em pt-BR):
+
+1. **Amostra:** "Localizar Amostras de Saúde" não tem treino como tipo. A lista é alfabética e sem busca; as seções E e T foram conferidas inteiras — não há "Exercício" nem "Treino". (De quebra: frequência cardíaca ali se chama **"Batimentos"**, não "Frequência Cardíaca".)
+2. **Ação:** não existe "Obter detalhes do treino". O iOS 26 adicionou 25+ ações novas e **nenhuma** de Saúde.
+3. **Gatilho:** a automação "Exercício com Apple Watch" **não passa o treino**. Provado por eco: a automação disparou num exercício real e mandou `{"eco":""}`.
+
+**Por que isso não é absurdo:** ler treino do HealthKit exige permissão concedida app por app. O Atalhos expõe *tipos de amostra* (número + data), não o objeto treino. Apps como Health Auto Export conseguem porque pedem a permissão como app.
+
+**O que ficou escrito e testado, pro dia em que servir:**
+
+- `/api/relogio/inicio` (POST grava, GET devolve em texto puro) e `/api/relogio/fim`, com `lib/cardio/janela.ts`.
+- **A janela do treino é descoberta pela DENSIDADE das amostras de FC** — ideia do usuário, e melhor que a minha: o relógio mede de segundos em segundos durante o exercício e de minutos em minutos em repouso, então o aglomerado desenha o treino sem ninguém avisar quando começou. Testado em produção: 35 min detectados, FC média 135 em vez dos 90 que sairiam misturando o repouso.
+- Data em pt-BR é lida à mão: `new Date("12/09/2026")` devolve 9 de dezembro.
+
+**Decisão:** parado por custo de montagem — são 6 ações numa interface que muda de nome a cada versão. Cardio continua sendo registrado à mão no app (4 toques). Se for retomado, o caminho é Health Auto Export (US$ 25, lê treino direto) e adaptar o payload, NÃO o Atalhos.
