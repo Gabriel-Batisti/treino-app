@@ -1,9 +1,8 @@
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { timingSafeEqual } from "node:crypto";
+import { createClient } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { classificarTreinoApple } from "@/lib/cardio/apple";
-import { casarComSessao, type JanelaSessao } from "@/lib/cardio/casar-sessao";
+import { tokenConfere } from "@/lib/cardio/token";
+import { processarTreino } from "@/lib/cardio/processar";
 
 /**
  * Recebe um treino do Apple Saúde, via Atalho do iOS.
@@ -59,60 +58,8 @@ const corpoSchema = z.object({
   fc_max: z.coerce.number().min(20).max(260).nullish(),
 });
 
-function tokenConfere(recebido: string | null): boolean {
-  const esperado = process.env.CARDIO_WEBHOOK_TOKEN;
-  if (!esperado || !recebido) return false;
-  const a = Buffer.from(recebido);
-  const b = Buffer.from(esperado);
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(a, b);
-}
-
-/** Data local (America/Sao_Paulo) do instante — D-012. */
-function dataLocalDe(iso: string): string {
-  return new Date(iso).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
-}
-
-const arred = (n: number | null | undefined) => (n != null ? Math.round(n) : null);
-
-async function gravarComoCardio(
-  db: SupabaseClient,
-  userId: string,
-  c: z.infer<typeof corpoSchema>,
-  inicio: Date,
-  tipo: string,
-  minutos: number,
-) {
-  // Idempotência sem ON CONFLICT: o índice de `origem_id` é PARCIAL e o
-  // Postgres não aceita índice parcial em ON CONFLICT.
-  const { data: existente } = await db
-    .from("cardios")
-    .select("id")
-    .eq("user_id", userId)
-    .eq("origem_id", c.origem_id)
-    .maybeSingle();
-
-  return db.from("cardios").upsert({
-    id: existente?.id ?? crypto.randomUUID(),
-    user_id: userId,
-    tipo,
-    fonte: "apple_saude",
-    origem_id: c.origem_id,
-    inicio_em: inicio.toISOString(),
-    data_local: dataLocalDe(inicio.toISOString()),
-    duracao_min: minutos,
-    calorias: arred(c.calorias),
-    distancia_km: c.distancia_km ?? null,
-    fc_media: arred(c.fc_media),
-    fc_max: arred(c.fc_max),
-    excluido_em: null,
-  });
-}
-
 export async function POST(request: NextRequest) {
-  const cabecalho = request.headers.get("authorization");
-  const token = cabecalho?.startsWith("Bearer ") ? cabecalho.slice(7) : cabecalho;
-  if (!tokenConfere(token)) {
+  if (!tokenConfere(request.headers.get("authorization"))) {
     return NextResponse.json({ erro: "não autorizado" }, { status: 401 });
   }
 
@@ -163,95 +110,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ erro: "nenhum usuário cadastrado" }, { status: 500 });
   }
 
-  // ── 1. cardio reconhecido não disputa sessão ───────────────────────────────
-  // "Bicicleta", "Esteira", "Corrida" são cardio e ponto. Se eu deixasse eles
-  // tentarem casar, a bike feita 10 minutos antes da musculação — no mesmo
-  // aparelho, no mesmo horário — seria anexada à sessão como se fosse o treino,
-  // e o treino de força chegando depois viraria um cardio falso. Só tenta casar
-  // o que PODE ser academia: treino de força e tipo que eu não reconheço
-  // (inclusive "Outro").
-  const classificacao = classificarTreinoApple(c.tipo);
-  const podeSerAcademia = classificacao.ehForca || !classificacao.reconhecido;
-
-  if (!podeSerAcademia) {
-    const { error } = await gravarComoCardio(db, userId, c, inicio, classificacao.tipo ?? "outro", duracaoMin);
-    if (error) return NextResponse.json({ erro: error.message }, { status: 500 });
-    return NextResponse.json({
-      ok: true,
-      tipo: classificacao.tipo,
-      duracao_min: duracaoMin,
-    });
-  }
-
-  // ── 2. tenta casar com uma sessão de musculação ────────────────────────────
-  const dia = dataLocalDe(inicio.toISOString());
-  const { data: sessoesDoDia } = await db
-    .from("sessoes")
-    .select("id, inicio_em, fim_em, apple_origem_id")
-    .eq("user_id", userId)
-    .eq("status", "concluida")
-    .in("data_local", [dia, dataLocalDe(new Date(inicio.getTime() - 86_400_000).toISOString())]);
-
-  const { sessao, distanciaMin } = casarComSessao(
-    (sessoesDoDia ?? []) as JanelaSessao[],
+  const resultado = await processarTreino(db, userId, {
+    origem_id: c.origem_id,
+    tipo: c.tipo,
     inicio,
     duracaoMin,
-    c.origem_id,
-  );
-
-  if (sessao) {
-    const { error } = await db
-      .from("sessoes")
-      .update({
-        fc_media: arred(c.fc_media),
-        fc_max: arred(c.fc_max),
-        calorias: arred(c.calorias),
-        apple_origem_id: c.origem_id,
-      })
-      .eq("id", sessao.id);
-
-    if (error) {
-      if (error.message.includes("fc_media") || error.message.includes("apple_origem_id")) {
-        return NextResponse.json({ erro: "rode a migration 0006 no Supabase" }, { status: 500 });
-      }
-      return NextResponse.json({ erro: error.message }, { status: 500 });
-    }
-
-    // Se este treino já tinha virado cardio numa tentativa anterior (o relógio
-    // encerrou antes do app), tira o cardio: agora ele pertence à sessão.
-    await db
-      .from("cardios")
-      .update({ excluido_em: new Date().toISOString() })
-      .eq("user_id", userId)
-      .eq("origem_id", c.origem_id);
-
-    return NextResponse.json({
-      ok: true,
-      anexado_ao_treino: sessao.id,
-      distancia_min: distanciaMin,
-    });
-  }
-
-  // ── 3. não casou: estaciona como cardio "outro" ────────────────────────────
-  // O tipo "outro" aqui não é chute: é a marca de "isto pode ser um treino de
-  // academia cuja sessão ainda não foi salva". `salvarSessao` procura
-  // exatamente por cardios "outro" do Apple pra absorver.
-  const tipo = "outro";
-  const { error } = await gravarComoCardio(db, userId, c, inicio, tipo, duracaoMin);
-
-  if (error) {
-    if (error.message.includes("origem_id") || error.message.includes("fc_media")) {
-      return NextResponse.json({ erro: "rode a migration 0005 no Supabase" }, { status: 500 });
-    }
-    return NextResponse.json({ erro: error.message }, { status: 500 });
-  }
-
-  return NextResponse.json({
-    ok: true,
-    tipo,
-    aguardando_treino: true,
-    duracao_min: duracaoMin,
+    calorias: c.calorias ?? null,
+    distancia_km: c.distancia_km ?? null,
+    fc_media: c.fc_media ?? null,
+    fc_max: c.fc_max ?? null,
   });
+
+  if (!resultado.ok) {
+    return NextResponse.json({ erro: resultado.erro }, { status: resultado.status });
+  }
+  return NextResponse.json(resultado);
 }
 
 /** GET só pra conferir, do navegador, que a rota subiu. Não expõe nada. */
