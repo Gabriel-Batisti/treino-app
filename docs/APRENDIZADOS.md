@@ -87,3 +87,36 @@ Tudo o que ficou bom na tela de treino veio de um print do Heavy com
 Primeira coisa ao abrir a dieta é pedir prints das telas que ele mais usa —
 registro de refeição, busca de alimento, resumo do dia — e pesquisar o fluxo do
 MFP, em vez de inventar do zero.
+
+## 10. O coach é da dieta, não do treino — e precisa do dado de HOJE
+
+Descoberto conversando, em 12/09/2026, depois que o botão de substituir
+exercício ficou pronto.
+
+**A regra que saiu disso:** o que tem resposta certa vira botão; o que exige
+julgamento vira conversa. Substituir exercício tinha resposta certa — mesmo
+músculo, mesma ênfase, outro aparelho, entre os que ele já faz — e virou uma
+lista determinística que responde num toque, sem rede. O coach não tinha o que
+fazer ali.
+
+**Na dieta é o contrário.** O caso que ele descreveu: *"já registrei o dia todo,
+falta a janta. Quero comer X e Y — olha o que sobrou de macro e me diz o que dá
+pra fazer e em que quantidade."* Isso tem dezenas de respostas válidas, e a boa
+depende do que ele gosta, do que tem em casa e de quanto ele aguenta comer.
+Nenhum botão resolve.
+
+**A consequência técnica, e é ela que muda o desenho:** o coach de treino vive
+bem com um retrato semanal (`coach/retrato.md`); carga e frequência não mudam de
+um dia pro outro. **O de dieta precisa do dado de agora** — quanto falta de
+proteína muda a cada refeição registrada.
+
+Então a tela de dieta nasce com uma das duas, e eu começaria pela primeira:
+
+1. **Resumo do dia copiável num toque** — total, restante por macro e o que já
+   foi comido, em texto. Ele cola no chat. Zero infraestrutura, funciona no
+   celular.
+2. **Chat dentro do app**, que já enxerga o dia. Mais bonito, custa chamada de
+   API e é mais uma tela pra manter.
+
+Ver também [`coach/README.md`](../coach/README.md) — a base (`principios.md`,
+`sobre-mim.md`) serve pros dois.
