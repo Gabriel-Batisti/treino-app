@@ -44,7 +44,15 @@ const corpoSchema = z.object({
   /** Nome do tipo, no idioma do iPhone. Pode ser "Outro" — e tudo bem. */
   tipo: z.string().trim().max(120),
   inicio_em: z.string().trim().min(10),
-  duracao_min: z.coerce.number().min(1).max(600),
+  /**
+   * Duração em MINUTOS — mas o Atalhos do iOS costuma entregar a duração do
+   * treino em segundos, e quem monta a automação não tem como saber qual dos
+   * dois saiu. Por isso o teto é alto e o valor é interpretado abaixo:
+   * acima de 600 só pode ser segundo, porque ninguém treina 10 horas.
+   */
+  duracao_min: z.coerce.number().min(1).max(86_400).optional(),
+  /** Alternativa explícita, pra quem preferir mandar sem ambiguidade. */
+  duracao_seg: z.coerce.number().min(1).max(86_400).optional(),
   calorias: z.coerce.number().min(0).max(5000).nullish(),
   distancia_km: z.coerce.number().min(0).max(500).nullish(),
   fc_media: z.coerce.number().min(20).max(260).nullish(),
@@ -73,6 +81,7 @@ async function gravarComoCardio(
   c: z.infer<typeof corpoSchema>,
   inicio: Date,
   tipo: string,
+  minutos: number,
 ) {
   // Idempotência sem ON CONFLICT: o índice de `origem_id` é PARCIAL e o
   // Postgres não aceita índice parcial em ON CONFLICT.
@@ -91,7 +100,7 @@ async function gravarComoCardio(
     origem_id: c.origem_id,
     inicio_em: inicio.toISOString(),
     data_local: dataLocalDe(inicio.toISOString()),
-    duracao_min: Math.max(1, Math.round(c.duracao_min)),
+    duracao_min: minutos,
     calorias: arred(c.calorias),
     distancia_km: c.distancia_km ?? null,
     fc_media: arred(c.fc_media),
@@ -123,6 +132,18 @@ export async function POST(request: NextRequest) {
   }
   const c = parsed.data;
 
+  const duracaoMin = (() => {
+    if (c.duracao_seg != null) return Math.max(1, Math.round(c.duracao_seg / 60));
+    if (c.duracao_min == null) return null;
+    return c.duracao_min > 600
+      ? Math.max(1, Math.round(c.duracao_min / 60))
+      : Math.max(1, Math.round(c.duracao_min));
+  })();
+
+  if (duracaoMin == null) {
+    return NextResponse.json({ erro: "faltou duracao_min ou duracao_seg" }, { status: 400 });
+  }
+
   const inicio = new Date(c.inicio_em);
   if (Number.isNaN(inicio.getTime())) {
     return NextResponse.json({ erro: "inicio_em inválido" }, { status: 400 });
@@ -153,12 +174,12 @@ export async function POST(request: NextRequest) {
   const podeSerAcademia = classificacao.ehForca || !classificacao.reconhecido;
 
   if (!podeSerAcademia) {
-    const { error } = await gravarComoCardio(db, userId, c, inicio, classificacao.tipo ?? "outro");
+    const { error } = await gravarComoCardio(db, userId, c, inicio, classificacao.tipo ?? "outro", duracaoMin);
     if (error) return NextResponse.json({ erro: error.message }, { status: 500 });
     return NextResponse.json({
       ok: true,
       tipo: classificacao.tipo,
-      duracao_min: Math.round(c.duracao_min),
+      duracao_min: duracaoMin,
     });
   }
 
@@ -174,7 +195,7 @@ export async function POST(request: NextRequest) {
   const { sessao, distanciaMin } = casarComSessao(
     (sessoesDoDia ?? []) as JanelaSessao[],
     inicio,
-    c.duracao_min,
+    duracaoMin,
     c.origem_id,
   );
 
@@ -216,7 +237,7 @@ export async function POST(request: NextRequest) {
   // academia cuja sessão ainda não foi salva". `salvarSessao` procura
   // exatamente por cardios "outro" do Apple pra absorver.
   const tipo = "outro";
-  const { error } = await gravarComoCardio(db, userId, c, inicio, tipo);
+  const { error } = await gravarComoCardio(db, userId, c, inicio, tipo, duracaoMin);
 
   if (error) {
     if (error.message.includes("origem_id") || error.message.includes("fc_media")) {
@@ -229,7 +250,7 @@ export async function POST(request: NextRequest) {
     ok: true,
     tipo,
     aguardando_treino: true,
-    duracao_min: Math.round(c.duracao_min),
+    duracao_min: duracaoMin,
   });
 }
 
@@ -246,7 +267,7 @@ export async function GET() {
       "origem_id (obrigatório)",
       "tipo (obrigatório)",
       "inicio_em (obrigatório, ISO 8601)",
-      "duracao_min (obrigatório)",
+      "duracao_min OU duracao_seg (um dos dois)",
       "calorias, distancia_km, fc_media, fc_max (opcionais)",
     ],
   });
