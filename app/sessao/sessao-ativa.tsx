@@ -50,6 +50,16 @@ interface SerieEmAndamento {
   id: string;
   indice: number;
   pesoKg: number | null;
+  /**
+   * O que está literalmente digitado no campo de peso, enquanto se digita.
+   *
+   * Sem isto, "12," era desfeito no mesmo instante: `Number("12,")` vira 12, o
+   * campo redesenhava "12" e a vírgula sumia antes do 5 chegar. Meio quilo é a
+   * menor anilha da academia — digitar 12,5 não pode ser impossível.
+   *
+   * Vive só enquanto o campo está em edição; ao sair, volta a mostrar o número.
+   */
+  pesoTexto?: string;
   reps: number | null;
   concluida: boolean;
   registradaEm: string | null;
@@ -215,6 +225,39 @@ export function SessaoAtiva({
       n + e.series.filter((s) => s.concluida).reduce((v, s) => v + (volume(s.pesoKg, s.reps) ?? 0), 0),
     0,
   );
+
+  /**
+   * Peso: guarda o texto cru E o número. O texto é o que aparece; o número é o
+   * que o app usa pra tudo o mais.
+   */
+  const alterarPeso = useCallback((exIdx: number, sIdx: number, texto: string) => {
+    // Só dígito e separador. Bloqueia sinal, espaço e o que mais o teclado do
+    // iOS deixar passar.
+    const limpo = texto.replace(/[^0-9.,]/g, "").replace(/[.,](?=.*[.,])/g, "");
+    setExercicios((prev) => {
+      const cp = structuredClone(prev);
+      const serie = cp[exIdx].series[sIdx];
+      serie.pesoTexto = limpo;
+      if (limpo === "") {
+        serie.pesoKg = null;
+      } else {
+        const n = Number(limpo.replace(",", "."));
+        // "12," não é número ainda, mas já vale 12: manter o valor antigo faria
+        // o volume do treino piscar pra trás a cada tecla.
+        if (Number.isFinite(n)) serie.pesoKg = n;
+      }
+      return cp;
+    });
+  }, []);
+
+  /** Ao sair do campo, o texto some e volta a valer o número formatado. */
+  const encerrarEdicaoPeso = useCallback((exIdx: number, sIdx: number) => {
+    setExercicios((prev) => {
+      const cp = structuredClone(prev);
+      delete cp[exIdx].series[sIdx].pesoTexto;
+      return cp;
+    });
+  }, []);
 
   const alterar = useCallback(
     (exIdx: number, sIdx: number, campo: "pesoKg" | "reps", valor: number | null) => {
@@ -574,15 +617,9 @@ export function SessaoAtiva({
                     <input
                       inputMode="decimal"
                       placeholder={ant ? formatPeso(ant.pesoKg) : "kg"}
-                      value={s.pesoKg ?? ""}
-                      onChange={(e) =>
-                        alterar(
-                          exIdx,
-                          sIdx,
-                          "pesoKg",
-                          e.target.value === "" ? null : Number(e.target.value.replace(",", ".")),
-                        )
-                      }
+                      value={s.pesoTexto ?? (s.pesoKg ?? "")}
+                      onChange={(e) => alterarPeso(exIdx, sIdx, e.target.value)}
+                      onBlur={() => encerrarEdicaoPeso(exIdx, sIdx)}
                       className="min-w-0 rounded-lg bg-card border border-border px-1 py-3 text-center tabular-nums outline-none focus:border-accent"
                     />
                     <input
