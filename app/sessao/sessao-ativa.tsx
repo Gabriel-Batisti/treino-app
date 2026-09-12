@@ -200,6 +200,12 @@ export function SessaoAtiva({
     if (agora < descansoAte) return;
     if (avisouRef.current === descansoAte) return;
     avisouRef.current = descansoAte;
+
+    // NÃO APITA ATRASADO. Com a tela bloqueada o iOS congela o app: o aviso
+    // só rodaria quando você voltasse, e um bipe 40 segundos depois do fim
+    // não avisa nada — só assusta. Marca como avisado e fica quieto.
+    if (agora - descansoAte > 5_000) return;
+
     tocarBip();
     void avisarDescansoAcabou();
   }, [agora, descansoAte]);
