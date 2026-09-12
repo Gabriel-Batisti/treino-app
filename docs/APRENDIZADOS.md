@@ -76,3 +76,14 @@ Quando eu listei opções sem recomendar, a conversa travou. Quando eu disse
 
 **Na dieta:** cada escolha de produto (TACO vs. Open Food Facts, macro completo
 vs. só caloria) vai com recomendação explícita e o custo aceito escrito.
+
+## 9. Print do app que ele já usa vale dez mensagens de requisito
+
+Tudo o que ficou bom na tela de treino veio de um print do Heavy com
+"deixa igual aqui": destaque da série, medalha de recorde, cronômetro com
+−15/+15/Pular, barra de treino em andamento.
+
+**Na dieta:** ele usa **MyFitnessPal** há anos e gosta de como funciona.
+Primeira coisa ao abrir a dieta é pedir prints das telas que ele mais usa —
+registro de refeição, busca de alimento, resumo do dia — e pesquisar o fluxo do
+MFP, em vez de inventar do zero.
