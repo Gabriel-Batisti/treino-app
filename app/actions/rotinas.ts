@@ -118,6 +118,37 @@ export async function adicionarExercicioNaRotina(payload: unknown): Promise<Resu
 }
 
 /**
+ * Muda quantas séries a rotina pede para um exercício.
+ *
+ * Chamado quando você termina o treino tendo feito um número diferente do que
+ * a rotina pedia — tirou uma série ou acrescentou — e confirma que isso vale
+ * pras próximas vezes. Sem isso, a correção teria que ser repetida todo treino.
+ *
+ * Casa por (rotina, exercício) e não por id da linha: quem faz o pedido é a
+ * tela de treino, que conhece o exercício, não a linha da rotina.
+ */
+export async function definirSeriesAlvo(payload: unknown): Promise<ResultadoAcao> {
+  const parsed = z
+    .object({ rotinaId: z.uuid(), exercicioId: z.uuid(), seriesAlvo: z.number().int().min(1).max(20) })
+    .safeParse(payload);
+  if (!parsed.success) return { ok: false, error: "dados inválidos" };
+  const { rotinaId, exercicioId, seriesAlvo } = parsed.data;
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("rotina_exercicios")
+    .update({ series_alvo: seriesAlvo })
+    .eq("rotina_id", rotinaId)
+    .eq("exercicio_id", exercicioId)
+    .is("excluido_em", null);
+
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/rotinas/${rotinaId}`);
+  revalidatePath("/rotinas");
+  return { ok: true, data: null };
+}
+
+/**
  * Tira o exercício da rotina. `excluido_em`, nunca delete (D-007) — e o
  * histórico das sessões que usaram esse exercício não é tocado.
  */

@@ -70,7 +70,7 @@ export interface DesempenhoLocal {
 /** Uma gravação esperando rede. `tentativas` evita ficar batendo em erro fatal. */
 export interface PendenciaLocal {
   id: string;
-  tipo: "sessao" | "cardio" | "exercicio" | "rotina_exercicio";
+  tipo: "sessao" | "cardio" | "exercicio" | "rotina_exercicio" | "rotina_series";
   payload: unknown;
   criadoEm: number;
   tentativas: number;

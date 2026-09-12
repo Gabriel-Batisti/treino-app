@@ -132,6 +132,10 @@ export function SessaoAtiva({
   // Painel do fim do treino: métricas do relógio e, se for o caso, a rotina.
   const [painelFim, setPainelFim] = useState(false);
   const [fcMedia, setFcMedia] = useState("");
+  /** Série sendo arrastada pro lado e o quanto já andou. Uma por vez. */
+  const [deslize, setDeslize] = useState<{ id: string; dx: number } | null>(null);
+  /** Quais exercícios passam a ter o número de séries feito hoje. */
+  const [aAjustarSeries, setAAjustarSeries] = useState<Record<string, boolean> | null>(null);
   const [calorias, setCalorias] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const [agora, setAgora] = useState(() => Date.now());
@@ -146,6 +150,10 @@ export function SessaoAtiva({
   const [retomado, setRetomado] = useState(false);
   /** Só grava rascunho depois de tentar restaurar, senão o vazio sobrescreve. */
   const prontoPraRascunho = useRef(false);
+  /** Toque em andamento numa linha de série, pro arrastar-pra-excluir. */
+  const toqueRef = useRef<{ id: string; x: number; y: number; horizontal: boolean | null } | null>(
+    null,
+  );
 
   /**
    * Retoma o treino que ficou pela metade.
@@ -323,6 +331,25 @@ export function SessaoAtiva({
     navigator.vibrate?.(30);
   }
 
+  /**
+   * Tira uma série da sessão e renumera as de baixo.
+   *
+   * Renumerar importa: `indice` é o que casa a série com o "anterior" da
+   * sessão passada, e um buraco na numeração desalinharia a coluna inteira.
+   */
+  function removerSerie(exIdx: number, sIdx: number) {
+    setDeslize(null);
+    setExercicios((prev) => {
+      const cp = structuredClone(prev);
+      const ex = cp[exIdx];
+      if (ex.series.length <= 1) return cp; // exercício sem série nenhuma não existe
+      ex.series.splice(sIdx, 1);
+      ex.series.forEach((s, i) => (s.indice = i + 1));
+      return cp;
+    });
+    navigator.vibrate?.(20);
+  }
+
   /** −15 / +15 no descanso. Nunca deixa o fim ficar no passado por engano. */
   function ajustarDescanso(seg: number) {
     setDescansoAte((ate) => (ate == null ? ate : Math.max(Date.now(), ate + seg * 1000)));
@@ -402,11 +429,35 @@ export function SessaoAtiva({
   }
 
   /**
+   * Exercícios cujo número de séries FEITAS hoje não bate com o que a rotina
+   * pede. É o que alimenta a pergunta "vale pras próximas?" no fim.
+   *
+   * Só conta exercício que já é da rotina: o que entrou hoje é tratado pela
+   * pergunta de inclusão, que é outra coisa.
+   */
+  function mudancasDeSeries() {
+    if (!rotinaId) return [];
+    return exercicios
+      .filter((e) => !e.foraDaRotina)
+      .map((e) => ({
+        exercicioId: e.exercicioId,
+        nome: e.nome,
+        de: e.seriesAlvo,
+        para: e.series.filter((s) => s.concluida).length,
+      }))
+      .filter((m) => m.para > 0 && m.para !== m.de);
+  }
+
+  /**
    * O "Concluir" abre a pergunta quando houver exercício fora da rotina; só
    * depois grava. Perguntar DEPOIS de salvar seria pior: o treino já teria ido
    * embora da tela e a decisão viraria abstrata.
    */
   function aoConcluir() {
+    const mudou = mudancasDeSeries();
+    if (mudou.length > 0 && aAjustarSeries === null) {
+      setAAjustarSeries(Object.fromEntries(mudou.map((m) => [m.exercicioId, true])));
+    }
     if (rotinaId && extrasDaRotina().length > 0 && aAdicionarNaRotina === null) {
       setAAdicionarNaRotina(
         Object.fromEntries(extrasDaRotina().map((e) => [e.exercicioId, true])),
@@ -428,8 +479,12 @@ export function SessaoAtiva({
    * setState e finalizar no mesmo tique, e a closure ainda veria o valor
    * antigo — os exercícios entrariam na rotina mesmo tendo sido recusados.
    */
-  async function finalizar(inclusoes?: Record<string, boolean>) {
+  async function finalizar(
+    inclusoes?: Record<string, boolean>,
+    ajustes?: Record<string, boolean>,
+  ) {
     const escolhidos = inclusoes ?? aAdicionarNaRotina;
+    const ajustesEscolhidos = ajustes ?? aAjustarSeries;
     setSalvando(true);
     setErro(null);
     const sessaoId = crypto.randomUUID();
@@ -480,6 +535,19 @@ export function SessaoAtiva({
         });
       }
     }
+    // Mudança no número de séries da rotina — mesma fila, mesmo motivo.
+    if (rotinaId && ajustesEscolhidos) {
+      for (const m of mudancasDeSeries()) {
+        if (!ajustesEscolhidos[m.exercicioId]) continue;
+        const id = crypto.randomUUID();
+        await enfileirar({
+          id,
+          tipo: "rotina_series",
+          payload: { rotinaId, exercicioId: m.exercicioId, seriesAlvo: m.para },
+        });
+      }
+    }
+
     // Dispara sem esperar: se não houver rede, fica na fila e sobe depois.
     void sincronizar();
     await limparRascunho();
@@ -594,17 +662,61 @@ export function SessaoAtiva({
                   s.pesoKg != null &&
                   ex.recordePesoKg != null &&
                   s.pesoKg > ex.recordePesoKg;
+                const dx = deslize?.id === s.id ? deslize.dx : 0;
                 return (
-                  <div
-                    key={s.id}
-                    className={`grid grid-cols-[1.6rem_4.2rem_1fr_1fr_2.75rem] gap-2 items-center rounded-lg ${
-                      s.concluida
-                        ? recorde
-                          ? "bg-amber-400/15 -mx-1 px-1"
-                          : "bg-accent/10 -mx-1 px-1"
-                        : ""
-                    }`}
-                  >
+                  <div key={s.id} className="relative">
+                    {/* Fundo que aparece conforme a linha sai da frente. */}
+                    <div
+                      className="absolute inset-0 rounded-lg bg-red-500/25 flex items-center justify-end pr-3 text-xs font-medium text-red-200"
+                      style={{ opacity: Math.min(1, Math.abs(dx) / 80) }}
+                      aria-hidden
+                    >
+                      Excluir
+                    </div>
+
+                    <div
+                      onTouchStart={(e) => {
+                        toqueRef.current = {
+                          id: s.id,
+                          x: e.touches[0].clientX,
+                          y: e.touches[0].clientY,
+                          horizontal: null,
+                        };
+                      }}
+                      onTouchMove={(e) => {
+                        const t = toqueRef.current;
+                        if (!t || t.id !== s.id) return;
+                        const ddx = e.touches[0].clientX - t.x;
+                        const ddy = e.touches[0].clientY - t.y;
+                        // Decide UMA vez se o dedo está indo pro lado ou pra
+                        // baixo. Sem esse trava, rolar a tela arrastaria linhas.
+                        if (t.horizontal === null) {
+                          if (Math.abs(ddx) < 8 && Math.abs(ddy) < 8) return;
+                          t.horizontal = Math.abs(ddx) > Math.abs(ddy);
+                        }
+                        if (!t.horizontal) return;
+                        setDeslize({ id: s.id, dx: Math.min(0, ddx) });
+                      }}
+                      onTouchEnd={() => {
+                        const t = toqueRef.current;
+                        toqueRef.current = null;
+                        if (!t?.horizontal) return;
+                        // Limiar alto de propósito: mão suada encosta na tela.
+                        if (dx < -90) removerSerie(exIdx, sIdx);
+                        else setDeslize(null);
+                      }}
+                      style={{
+                        transform: `translateX(${dx}px)`,
+                        transition: deslize?.id === s.id ? "none" : "transform .15s",
+                      }}
+                      className={`relative grid grid-cols-[1.6rem_4.2rem_1fr_1fr_2.75rem] gap-2 items-center rounded-lg ${
+                        s.concluida
+                          ? recorde
+                            ? "bg-amber-400/15 -mx-1 px-1"
+                            : "bg-accent/10 -mx-1 px-1"
+                          : "bg-background"
+                      }`}
+                    >
                     <span className="text-center text-xs text-muted tabular-nums">
                       {recorde ? <span aria-label="recorde">🏅</span> : s.indice}
                     </span>
@@ -653,6 +765,7 @@ export function SessaoAtiva({
                     >
                       ✓
                     </button>
+                    </div>
                   </div>
                 );
               })}
@@ -723,6 +836,54 @@ export function SessaoAtiva({
               </p>
             </section>
 
+            {aAjustarSeries !== null && mudancasDeSeries().length > 0 && (
+              <section className="mt-8">
+                <h2 className="text-xl font-semibold tracking-tight">
+                  Mudou o número de séries
+                </h2>
+                <p className="mt-2 text-sm text-muted">
+                  Marque o que deve valer também nos próximos treinos desta rotina.
+                </p>
+                <ul className="mt-4 flex flex-col gap-2">
+                  {mudancasDeSeries().map((m) => {
+                    const marcado = aAjustarSeries[m.exercicioId];
+                    return (
+                      <li key={m.exercicioId}>
+                        <button
+                          onClick={() =>
+                            setAAjustarSeries((prev) => ({
+                              ...prev!,
+                              [m.exercicioId]: !marcado,
+                            }))
+                          }
+                          aria-pressed={marcado}
+                          className={`w-full rounded-2xl border p-4 flex items-center gap-3 text-left ${
+                            marcado ? "bg-card border-accent" : "bg-card border-border"
+                          }`}
+                        >
+                          <span
+                            className={`size-6 shrink-0 rounded-md border grid place-items-center text-sm ${
+                              marcado
+                                ? "bg-accent border-accent text-black"
+                                : "border-border text-transparent"
+                            }`}
+                          >
+                            ✓
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block truncate">{m.nome}</span>
+                            <span className="block text-[11px] text-muted tabular-nums">
+                              {m.de} → {m.para} {m.para === 1 ? "série" : "séries"}
+                            </span>
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            )}
+
             {aAdicionarNaRotina !== null && (
             <>
             <h2 className="mt-8 text-xl font-semibold tracking-tight">Atualizar a rotina?</h2>
@@ -786,15 +947,15 @@ export function SessaoAtiva({
             >
               {salvando ? "salvando…" : "Salvar treino"}
             </button>
-            {aAdicionarNaRotina !== null ? (
+            {aAdicionarNaRotina !== null || aAjustarSeries !== null ? (
               <button
                 // Passa {} direto: depender do setState acima faria a closure
                 // ver o valor antigo e adicionar o que você acabou de recusar.
-                onClick={() => void finalizar({})}
+                onClick={() => void finalizar({}, {})}
                 disabled={salvando}
                 className="w-full py-3 text-center text-sm text-muted"
               >
-                Salvar sem mudar a rotina
+                Salvar sem mexer na rotina
               </button>
             ) : (
               <button

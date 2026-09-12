@@ -12,7 +12,7 @@ import { puxarDadosLocais } from "@/app/actions/sync";
 import { salvarSessao } from "@/app/actions/treino";
 import { salvarCardio } from "@/app/actions/cardio";
 import { criarExercicio } from "@/app/actions/exercicios";
-import { adicionarExercicioNaRotina } from "@/app/actions/rotinas";
+import { adicionarExercicioNaRotina, definirSeriesAlvo } from "@/app/actions/rotinas";
 import {
   lerFila,
   removerDaFila,
@@ -48,7 +48,9 @@ async function empurrar(): Promise<{ enviados: number; pendentes: number }> {
             ? await salvarCardio(p.payload)
             : p.tipo === "exercicio"
               ? await criarExercicio(p.payload)
-              : await adicionarExercicioNaRotina(p.payload);
+              : p.tipo === "rotina_exercicio"
+                ? await adicionarExercicioNaRotina(p.payload)
+                : await definirSeriesAlvo(p.payload);
       if (r.ok) {
         await removerDaFila(p.id);
         enviados++;
