@@ -191,3 +191,53 @@ O export do Heavy traz **RPE**. Converter pra RIR na importação perderia infor
 **Um export que nunca foi restaurado não é backup.** O primeiro restore num projeto Supabase vazio é tarefa executada, não intenção.
 
 Roda como tarefa agendada semanal. De quebra **mantém o free tier acordado** — a pausa é por 7 dias de inatividade.
+
+---
+
+## D-017 — O tipo do treino do Apple Watch confirma cardio, nunca reconhece academia
+**12/09/2026**
+
+O relógio manda o **nome do tipo**, e o usuário registra musculação como "Outro" — às vezes como "Treino de força". Filtrar academia pelo nome, que era o desenho da 0005, criava um cardio falso por cima de cada treino de verdade.
+
+**Quem decide é o horário:** se existe sessão do app sobrepondo o treino do relógio (30 min de folga), são a mesma coisa, e FC/calorias vão pra dentro dela (`sessoes.fc_media`, `fc_max`, `calorias`, `apple_origem_id` — migration 0006).
+
+**Mas o tipo voltou pro jogo numa direção só.** Cardio reconhecido ("Bicicleta", "Esteira", "Corrida") grava direto e **não disputa sessão**: a bike de aquecimento 10 min antes da musculação cai dentro da janela de sobreposição, e sem esta regra ela seria anexada como se fosse o treino — jogando o treino de força chegando depois pra cardio falso. Só tenta casar o que **pode** ser academia: força e tipo desconhecido.
+
+**Funciona nas duas ordens**, que era o problema real — a automação dispara ao encerrar no relógio, que pode ser antes de tocar em Concluir no app. Relógio primeiro → estaciona como cardio `"outro"`; `salvarSessao` procura cardio do Apple **com tipo `"outro"`** e absorve. Esse filtro por tipo é o que impede a sessão de engolir a bike do mesmo dia.
+
+Verificado em produção nos dois sentidos, com reenvio e com bike+força no mesmo horário.
+
+---
+
+## D-018 — O laudo InBody é lido no servidor; a data vem do histórico, não do "Data/Hora"
+**12/09/2026**
+
+`lib/medidas/inbody.ts` extrai 7 campos do PDF (acertou 7/7 nos dois exames reais). O extrator (`unpdf`, ~1 MB) fica **no servidor**: no bundle, toda navegação do app pagaria por uma tela usada uma vez por mês.
+
+**A data NÃO vem do campo "Data/Hora" do laudo.** Num dos dois exames ele traz `10/02/2026` para um exame que o próprio histórico do PDF data em `07.06.25` — aquele campo é quando o PDF foi **gerado**. Vale a última data do "Histórico da Composição Corporal", que bate com o que o usuário tinha digitado à mão.
+
+Dois valores são derivados, não lidos: massa magra = peso − gordura (o laudo não imprime), e água vem em **litros** enquanto a coluna é percentual.
+
+**Preenche só campo vazio.** Número corrigido à mão manda no PDF.
+
+---
+
+## D-019 — Gráfico de medidas: eixo X é tempo, não índice
+**12/09/2026**
+
+Bioimpedância é de dois em dois meses; pesagem é diária. Espaçar por posição na lista colocaria dois exames separados por 14 meses à mesma distância de duas pesagens seguidas — o gráfico mentiria sobre o ritmo da mudança.
+
+`touch-action: pan-y` no SVG é o que faz a varredura por toque conviver com a rolagem da página: lateral varre, vertical rola. Com `none`, o gráfico prenderia a rolagem.
+
+---
+
+## D-020 — Lembrete diário por Web Push, com ±1h aceito
+**12/09/2026**
+
+Cron da Vercel → `/api/lembrete` → Web Push. **Não notifica quem já registrou o peso no dia** — lembrete que chega depois da coisa feita é o que faz desligar notificação.
+
+**A imprecisão é do gatilho, não da entrega.** Na Hobby o cron é 1×/dia com precisão de hora (±59 min, documentado pela Vercel): agendado 10:00 UTC, chega entre 7h e 8h.
+
+**Custo aceito conscientemente.** A alternativa gratuita e exata existe — `pg_cron` no Supabase chamando a mesma rota — e foi recusada: para lembrete matinal de pesagem, ±1h não muda nada, e não vale uma migration + o segredo guardado no banco. Se um dia a precisão importar, o caminho é esse, não o plano Pro.
+
+No iOS, Web Push **exige o app instalado na tela de início** — no Safari a API nem existe. O botão do Perfil trata isso como estado próprio, não como erro.
