@@ -46,3 +46,11 @@ backups/
 # Arquivos de entrada (export do Heavy, seeds baixados).
 # Não versionar: dado pessoal e arquivos grandes.
 data/
+
+# Retrato e contexto do coach — dado pessoal de treino, e o repositório é
+# PÚBLICO. `retrato.md` é gerado (npx tsx scripts/retrato-coach.ts) e
+# `sobre-mim.md` é o mais pessoal de tudo. O que entra no git é só o exemplo.
+coach/retrato.md
+coach/sobre-mim.md
+coach/transcricoes/
+coach/principios.md
