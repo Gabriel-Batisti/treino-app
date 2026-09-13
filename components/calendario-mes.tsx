@@ -74,6 +74,10 @@ export function CalendarioMes({ dias, hoje }: { dias: DiaAtivo[]; hoje: string }
           const data = `${visivel.ano}-${String(visivel.mes).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
           const ativo = porData.get(data);
           const ehHoje = data === hoje;
+          // Treino e cardio no mesmo dia mostravam a mesma bolinha do treino
+          // sozinho: o cardio sumia. Agora o dia cheio é a bolinha sólida MAIS
+          // um anel em volta — dois sinais, não um vencendo o outro.
+          const ambos = !!ativo?.treino && !!ativo?.cardio;
           return (
             <span key={data} className="grid place-items-center">
               <span
@@ -85,7 +89,7 @@ export function CalendarioMes({ dias, hoje }: { dias: DiaAtivo[]; hoje: string }
                       : ehHoje
                         ? "border border-muted text-foreground"
                         : "text-muted"
-                }`}
+                } ${ambos ? "ring-2 ring-offset-2 ring-accent/70 ring-offset-card" : ""}`}
               >
                 {dia}
               </span>
@@ -100,6 +104,10 @@ export function CalendarioMes({ dias, hoje }: { dias: DiaAtivo[]; hoje: string }
         </span>
         <span className="flex items-center gap-1.5">
           <span className="size-2.5 rounded-full border border-accent" /> cardio
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="size-2.5 rounded-full bg-accent ring-1 ring-offset-1 ring-accent/70 ring-offset-card" />{" "}
+          os dois
         </span>
       </div>
     </div>
