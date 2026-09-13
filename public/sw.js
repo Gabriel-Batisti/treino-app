@@ -129,14 +129,14 @@ self.addEventListener("push", (evento) => {
       icon: "/icon-192.png",
       badge: "/icon-192.png",
       tag: dado.tag || "lembrete",
-      data: { url: dado.url || "/peso" },
+      data: { url: dado.url || "/corpo/medidas" },
     }),
   );
 });
 
 self.addEventListener("notificationclick", (evento) => {
   evento.notification.close();
-  const destino = evento.notification.data?.url || "/peso";
+  const destino = evento.notification.data?.url || "/corpo/medidas";
   evento.waitUntil(
     (async () => {
       const abas = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
