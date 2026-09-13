@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 /**
- * As três sub-abas de "Meu corpo".
+ * As sub-abas de "Meu corpo".
  *
  * Client Component só por causa do `usePathname` — o conteúdo de cada aba
  * continua renderizado no servidor.
@@ -12,6 +12,7 @@ import { usePathname } from "next/navigation";
 const ABAS = [
   { href: "/corpo", rotulo: "Bioimpedância" },
   { href: "/corpo/medidas", rotulo: "Peso" },
+  { href: "/corpo/fita", rotulo: "Medidas" },
   { href: "/corpo/fotos", rotulo: "Fotos" },
 ] as const;
 
