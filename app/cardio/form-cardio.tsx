@@ -22,12 +22,14 @@ const CHAVE = "cardio-em-andamento";
 
 const TIPOS = [
   { valor: "esteira", rotulo: "Esteira" },
-  { valor: "bicicleta", rotulo: "Bicicleta" },
+  { valor: "bicicleta", rotulo: "Bike (academia)" },
+  { valor: "bicicleta_externa", rotulo: "Bike (rua)" },
   { valor: "eliptico", rotulo: "Elíptico" },
   { valor: "escada", rotulo: "Escada" },
   { valor: "remo", rotulo: "Remo" },
   { valor: "corrida", rotulo: "Corrida" },
   { valor: "caminhada", rotulo: "Caminhada" },
+  { valor: "futebol", rotulo: "Futebol" },
   { valor: "outro", rotulo: "Outro" },
 ] as const;
 

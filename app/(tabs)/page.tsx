@@ -8,12 +8,14 @@ export const dynamic = "force-dynamic";
 
 const ROTULO_CARDIO: Record<string, string> = {
   esteira: "Esteira",
-  bicicleta: "Bicicleta",
+  bicicleta: "Bike",
+  bicicleta_externa: "Bike na rua",
   eliptico: "Elíptico",
   escada: "Escada",
   remo: "Remo",
   corrida: "Corrida",
   caminhada: "Caminhada",
+  futebol: "Futebol",
   outro: "Cardio",
 };
 

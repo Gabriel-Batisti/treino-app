@@ -12,11 +12,13 @@ import { normalizarNome } from "@/lib/treino/texto";
 export type TipoCardio =
   | "esteira"
   | "bicicleta"
+  | "bicicleta_externa"
   | "eliptico"
   | "escada"
   | "remo"
   | "corrida"
   | "caminhada"
+  | "futebol"
   | "outro";
 
 /** Ordem importa: o primeiro que casar vence. Mais específico primeiro. */
@@ -25,7 +27,12 @@ const REGRAS: [RegExp, TipoCardio][] = [
   [/eliptic|elliptic/, "eliptico"],
   [/escada|stair|degrau/, "escada"],
   [/\bremo\b|rowing|rower/, "remo"],
+  // Ao ar livre ANTES da bicicleta genérica: "ciclismo ao ar livre" contém
+  // as duas palavras, e quem chega primeiro vence.
+  [/(bicicleta|ciclismo|cycling|cycle|bike).{0,20}(ar livre|rua|outdoor|estrada|road)/, "bicicleta_externa"],
+  [/(outdoor|ar livre).{0,20}(bicicleta|ciclismo|cycling|cycle|bike)/, "bicicleta_externa"],
   [/bicicleta|cycling|cycle|bike|spinning|indoor cycle/, "bicicleta"],
+  [/futebol|soccer|football|futsal/, "futebol"],
   // "corrida" tem que vir depois de esteira: "corrida na esteira" é esteira.
   [/corrida|running|\brun\b|trilha|trail/, "corrida"],
   [/caminhada|walking|\bwalk\b|hiking|caminhar/, "caminhada"],

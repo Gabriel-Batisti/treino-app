@@ -120,3 +120,36 @@ Então a tela de dieta nasce com uma das duas, e eu começaria pela primeira:
 
 Ver também [`coach/README.md`](../coach/README.md) — a base (`principios.md`,
 `sobre-mim.md`) serve pros dois.
+
+## 11. Agente dentro do app: quanto custa e como ele mexe nos dados
+
+Pesquisado em 12/09/2026, pra decidir na hora da dieta. Preços de setembro/2026.
+
+**Custo por pergunta** (~4 mil tokens de entrada, ~600 de saída):
+
+| modelo | por pergunta | 3/dia no mês |
+|---|---|---|
+| Haiku 4.5 | ~US$ 0,007 | ~US$ 0,70 |
+| **Sonnet 4.6** | ~US$ 0,022 | **~US$ 2** |
+| Opus 4.8 | ~US$ 0,037 | ~US$ 3,50 |
+
+Com **cache de prompt** (princípios e `sobre-mim` não mudam) a entrada repetida
+custa 10%, e o Sonnet cai pra ~US$ 1/mês. Sem mensalidade, paga-se o uso.
+
+**Recomendação: Sonnet.** Conta de macro o Haiku faz; "o que dá pra jantar com o
+que sobrou, considerando o que você gosta" é julgamento.
+
+**Se o agente for escrever no app**, três regras:
+
+1. **As ferramentas chamam as mesmas Server Actions que a tela usa** — nunca SQL
+   solto. Assim Zod, RLS e as regras do app continuam valendo, e o agente não
+   ganha um caminho privilegiado.
+2. **Escrita passa por confirmação na tela.** Não é desconfiança do modelo:
+   errar quantidade e descobrir três dias depois estraga o histórico, que é a
+   única coisa do app que não dá pra refazer.
+3. **A chave da API fica no servidor.** O app chama uma rota própria, a rota
+   chama a Anthropic. Chave no cliente é chave vazada.
+
+Começar **só leitura**. Se depois de duas semanas ele estiver repetindo no
+formulário o que o agente disse, aí as ferramentas de escrita se justificam — e
+já se sabe exatamente quais.

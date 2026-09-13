@@ -12,7 +12,20 @@ import { createClient } from "@/lib/supabase/server";
 
 const cardioSchema = z.object({
   id: z.uuid(),
-  tipo: z.enum(["esteira", "bicicleta", "eliptico", "escada", "remo", "corrida", "caminhada", "outro"]),
+  // Espelha o check da migration 0009. Divergir aqui dá erro do Postgres em
+  // vez de erro de validação, e o usuário vê a mensagem errada.
+  tipo: z.enum([
+    "esteira",
+    "bicicleta",
+    "bicicleta_externa",
+    "eliptico",
+    "escada",
+    "remo",
+    "corrida",
+    "caminhada",
+    "futebol",
+    "outro",
+  ]),
   inicio_em: z.iso.datetime({ offset: true }),
   // Do relógio do celular, não de now() no servidor (D-012).
   data_local: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
