@@ -106,26 +106,41 @@ function BarraFaixa({
     { rotulo: "acima", left: b, width: 100 - b, destaque: valor > faixa.max },
   ];
 
+  // Onde o valor caiu ganha fundo e texto cheio; o resto fica legível, mas
+  // claramente secundário. Antes os três eram igualmente apagados e a barra
+  // não dizia nada de relance — que é como ela é lida.
+  const corDoTrecho = (destaque: boolean) =>
+    destaque
+      ? dentro
+        ? "bg-accent/30 text-foreground font-semibold"
+        : "bg-amber-400/30 text-foreground font-semibold"
+      : "text-foreground/55";
+
   return (
     <div className="mt-3">
-      <div className="relative h-7 rounded-lg overflow-hidden bg-border/40">
-        <div
-          className={`absolute inset-y-0 ${dentro ? "bg-accent/25" : "bg-amber-400/20"}`}
-          style={{ left: `${a}%`, width: `${b - a}%` }}
-        />
+      <div className="relative h-8 rounded-lg overflow-hidden bg-border/30">
         {trechos.map((t) => (
           <span
             key={t.rotulo}
-            className={`absolute inset-y-0 grid place-items-center text-[9px] uppercase tracking-wide ${
-              t.destaque ? "text-foreground font-medium" : "text-muted"
-            }`}
+            className={`absolute inset-y-0 grid place-items-center text-[10px] uppercase tracking-wide ${corDoTrecho(
+              t.destaque,
+            )}`}
             style={{ left: `${t.left}%`, width: `${t.width}%` }}
           >
             {t.width > 14 ? t.rotulo : ""}
           </span>
         ))}
+
+        {/* O marcador é o que você procura primeiro: linha grossa e uma
+            bolinha em cima, pra achar mesmo de longe e com a barra colorida
+            atrás. */}
         <div
-          className="absolute top-0 bottom-0 w-0.5 bg-foreground"
+          className="absolute inset-y-0 w-[3px] -translate-x-1/2 bg-foreground rounded-full"
+          style={{ left: `${marcador}%` }}
+          aria-hidden
+        />
+        <div
+          className="absolute top-1 size-2 -translate-x-1/2 rounded-full bg-foreground"
           style={{ left: `${marcador}%` }}
           aria-hidden
         />
