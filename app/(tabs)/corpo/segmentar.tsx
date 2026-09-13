@@ -53,20 +53,39 @@ export function Segmentar({
         ))}
       </div>
 
-      <div className="mt-4 grid grid-cols-[1fr_auto_1fr] gap-x-3 gap-y-5 items-center">
+      {/* Três colunas, duas linhas. A silhueta ocupa a coluna do meio inteira
+          e o TRONCO fica sobre ela — era ele que, com `row-span` na grade,
+          escorregava pra coluna do braço esquerdo. */}
+      <div className="mt-4 grid grid-cols-[1fr_auto_1fr] gap-x-2 gap-y-6 items-center">
         <Lado
           rotulo="Braço direito"
           valor={atual?.bracoDireito ?? null}
           antes={antes?.bracoDireito ?? null}
           fmt={fmt}
+          subirEhRuim={modo === "gordura"}
           alinhar="left"
         />
-        <Silhueta />
+
+        <div className="row-span-2 relative grid place-items-center">
+          <Silhueta />
+          <div className="absolute inset-x-0 top-1/2 -translate-y-1/2">
+            <Lado
+              rotulo="Tronco"
+              valor={atual?.tronco ?? null}
+              antes={antes?.tronco ?? null}
+              fmt={fmt}
+              subirEhRuim={modo === "gordura"}
+              alinhar="center"
+            />
+          </div>
+        </div>
+
         <Lado
           rotulo="Braço esquerdo"
           valor={atual?.bracoEsquerdo ?? null}
           antes={antes?.bracoEsquerdo ?? null}
           fmt={fmt}
+          subirEhRuim={modo === "gordura"}
           alinhar="right"
         />
 
@@ -75,20 +94,15 @@ export function Segmentar({
           valor={atual?.pernaDireita ?? null}
           antes={antes?.pernaDireita ?? null}
           fmt={fmt}
+          subirEhRuim={modo === "gordura"}
           alinhar="left"
-        />
-        <Lado
-          rotulo="Tronco"
-          valor={atual?.tronco ?? null}
-          antes={antes?.tronco ?? null}
-          fmt={fmt}
-          alinhar="center"
         />
         <Lado
           rotulo="Perna esquerda"
           valor={atual?.pernaEsquerda ?? null}
           antes={antes?.pernaEsquerda ?? null}
           fmt={fmt}
+          subirEhRuim={modo === "gordura"}
           alinhar="right"
         />
       </div>
@@ -102,14 +116,18 @@ function Lado({
   antes,
   fmt,
   alinhar,
+  subirEhRuim = false,
 }: {
   rotulo: string;
   valor: number | null;
   antes: number | null;
   fmt: (n: number | null) => string;
   alinhar: "left" | "right" | "center";
+  /** Ganhar massa magra é bom; ganhar gordura, não. Só muda a cor. */
+  subirEhRuim?: boolean;
 }) {
   const delta = valor != null && antes != null ? Math.round((valor - antes) * 100) / 100 : null;
+  const bom = delta == null ? null : subirEhRuim ? delta < 0 : delta > 0;
   const alinha =
     alinhar === "left" ? "text-left" : alinhar === "right" ? "text-right" : "text-center";
 
@@ -118,7 +136,7 @@ function Lado({
       <p className="text-[10px] text-muted leading-tight">{rotulo}</p>
       <p className="text-lg tabular-nums leading-tight">{fmt(valor)}</p>
       {delta != null && delta !== 0 && (
-        <p className={`text-[10px] tabular-nums ${delta > 0 ? "text-accent" : "text-amber-400"}`}>
+        <p className={`text-[10px] tabular-nums ${bom ? "text-accent" : "text-amber-400"}`}>
           {delta > 0 ? "+" : ""}
           {delta.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} kg
         </p>
