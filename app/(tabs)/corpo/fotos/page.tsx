@@ -71,16 +71,15 @@ export default async function Fotos() {
   const dias = [...porDia.values()];
 
   return (
-    <main className="flex-1 flex flex-col pt-safe px-4">
-      <header className="pt-6 pb-4 flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight">Fotos</h1>
+    <div className="flex-1 flex flex-col px-4 pt-4">
+      <div className="flex justify-end">
         <Link
           href="/foto-nova"
-          className="rounded-full border border-border px-4 py-2 text-xs text-accent shrink-0"
+          className="rounded-full border border-border px-4 py-2 text-xs text-accent"
         >
           + Foto
         </Link>
-      </header>
+      </div>
 
       {faltaMigration && (
         <p className="mb-4 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-xs text-amber-300">
@@ -99,6 +98,6 @@ export default async function Fotos() {
       )}
 
       <div className="h-6" />
-    </main>
+    </div>
   );
 }

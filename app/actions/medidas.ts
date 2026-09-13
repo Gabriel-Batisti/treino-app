@@ -27,6 +27,13 @@ const medidaSchema = z.object({
   cintura_cm: z.number().gt(0).nullable(),
   arquivo_path: z.string().max(400).nullable(),
   notas: z.string().max(500).nullable(),
+  /**
+   * Laudo completo lido do PDF (migration 0010). `unknown` de propósito: a
+   * forma é do parser, e validar campo a campo aqui só criaria um segundo
+   * lugar pra manter quando a clínica mudar o laudo. O que vira COLUNA é
+   * validado acima, um por um.
+   */
+  dados: z.unknown().nullish(),
 });
 
 export type ResultadoAcao<T = null> = { ok: true; data: T } | { ok: false; error: string };
@@ -54,7 +61,7 @@ export async function salvarMedida(payload: unknown): Promise<ResultadoAcao> {
     return { ok: false, error: error.message };
   }
 
-  revalidatePath("/peso");
+  revalidatePath("/corpo/medidas");
   revalidatePath("/");
   return { ok: true, data: null };
 }
@@ -70,7 +77,7 @@ export async function excluirMedida(id: string): Promise<ResultadoAcao> {
     .eq("id", id);
 
   if (error) return { ok: false, error: error.message };
-  revalidatePath("/peso");
+  revalidatePath("/corpo/medidas");
   revalidatePath("/");
   return { ok: true, data: null };
 }

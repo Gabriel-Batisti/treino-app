@@ -46,6 +46,8 @@ export function FormBioimpedancia() {
   const [erro, setErro] = useState<string | null>(null);
   const [lendo, setLendo] = useState(false);
   const [lido, setLido] = useState<number | null>(null);
+  /** O laudo inteiro, pra guardar junto e alimentar a tela de detalhe. */
+  const [laudo, setLaudo] = useState<unknown>(null);
 
   const numero = (s: string | undefined): number | null => {
     const v = s?.trim().replace(",", ".");
@@ -60,6 +62,7 @@ export function FormBioimpedancia() {
   function escolher(f: File | null) {
     setErro(null);
     setLido(null);
+    setLaudo(null);
     if (!f) return setArquivo(null);
     if (f.size > TAMANHO_MAX) {
       setErro("Arquivo acima de 10 MB. Tire uma foto menor ou comprima o PDF.");
@@ -85,6 +88,7 @@ export function FormBioimpedancia() {
     if (!r.ok || r.data.achados === 0) return;
 
     const l = r.data;
+    setLaudo(l);
     if (l.data_local) setData(l.data_local);
     if (l.peso_kg != null) setPeso((p) => p.trim() || String(l.peso_kg));
     setValores((v) => {
@@ -157,6 +161,7 @@ export function FormBioimpedancia() {
       cintura_cm: numero(valores.cintura_cm),
       arquivo_path: caminho,
       notas: null,
+      dados: laudo,
     });
 
     setSalvando(false);
@@ -165,7 +170,7 @@ export function FormBioimpedancia() {
       setErro(r.error);
       return;
     }
-    router.push("/peso");
+    router.push("/corpo/medidas");
     router.refresh();
   }
 
@@ -173,7 +178,7 @@ export function FormBioimpedancia() {
     <main className="flex-1 flex flex-col pb-safe">
       <header className="pt-safe sticky top-0 z-30 bg-background/95 backdrop-blur border-b border-border">
         <div className="px-4 pt-3 pb-3 flex items-center gap-2">
-          <Link href="/peso" aria-label="voltar" className="size-9 -ml-2 grid place-items-center text-muted text-2xl leading-none">
+          <Link href="/corpo/medidas" aria-label="voltar" className="size-9 -ml-2 grid place-items-center text-muted text-2xl leading-none">
             ‹
           </Link>
           <span className="text-sm font-medium">Bioimpedância</span>

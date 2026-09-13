@@ -43,7 +43,7 @@ export async function salvarFoto(payload: unknown): Promise<ResultadoAcao> {
     return { ok: false, error: error.message };
   }
 
-  revalidatePath("/fotos");
+  revalidatePath("/corpo/fotos");
   return { ok: true, data: null };
 }
 
@@ -62,7 +62,7 @@ export async function excluirFoto(id: string): Promise<ResultadoAcao> {
     .eq("id", id);
 
   if (error) return { ok: false, error: error.message };
-  revalidatePath("/fotos");
+  revalidatePath("/corpo/fotos");
   return { ok: true, data: null };
 }
 

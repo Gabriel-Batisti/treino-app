@@ -94,7 +94,7 @@ export async function GET(request: NextRequest) {
     const corpo = JSON.stringify({
       titulo: "Bom dia",
       corpo: "Registra o peso de hoje?",
-      url: "/peso",
+      url: "/corpo/medidas",
       tag: "peso-diario",
     });
 

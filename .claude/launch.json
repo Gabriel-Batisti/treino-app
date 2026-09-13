@@ -1,7 +1,31 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "treino-app", "runtimeExecutable": "pnpm", "runtimeArgs": ["dev"], "port": 3000 },
-    { "name": "treino-prod", "runtimeExecutable": "pnpm", "runtimeArgs": ["start"], "port": 3000 }
+    {
+      "name": "treino-app",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "dev"
+      ],
+      "port": 3000
+    },
+    {
+      "name": "treino-prod",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "start"
+      ],
+      "port": 3000
+    },
+    {
+      "name": "treino-app-3010",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "dev",
+        "--port",
+        "3010"
+      ],
+      "port": 3010
+    }
   ]
 }

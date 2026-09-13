@@ -14,6 +14,7 @@ import { usePathname } from "next/navigation";
 const ABAS = [
   { href: "/", rotulo: "Início", icone: InicioIcone },
   { href: "/rotinas", rotulo: "Treino", icone: TreinoIcone },
+  { href: "/corpo", rotulo: "Corpo", icone: CorpoIcone },
   { href: "/perfil", rotulo: "Perfil", icone: PerfilIcone },
 ] as const;
 
@@ -43,6 +44,17 @@ export function BarraAbas() {
         })}
       </ul>
     </nav>
+  );
+}
+
+function CorpoIcone() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <circle cx="12" cy="4.5" r="2" />
+      <path d="M5 9h14" />
+      <path d="M12 9v6" />
+      <path d="M9 21l3-6 3 6" />
+    </svg>
   );
 }
 

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { GraficoMedidas } from "@/components/grafico-medidas";
 import { RegistrarPeso } from "./registrar-peso";
@@ -41,18 +40,7 @@ export default async function Peso() {
   const ultima = medidas[0];
 
   return (
-    <main className="flex-1 flex flex-col pt-safe px-4">
-      <header className="pt-6 pb-4 flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight">Peso</h1>
-        <div className="flex gap-2 shrink-0">
-          <Link href="/fotos" className="rounded-full border border-border px-4 py-2 text-xs text-accent">
-            Fotos
-          </Link>
-          <Link href="/bioimpedancia" className="rounded-full border border-border px-4 py-2 text-xs text-accent">
-            + Bio
-          </Link>
-        </div>
-      </header>
+    <div className="flex-1 flex flex-col px-4 pt-4">
 
       {faltaMigration && (
         <p className="mb-4 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-xs text-amber-300">
@@ -98,6 +86,6 @@ export default async function Peso() {
       </section>
 
       <div className="h-6" />
-    </main>
+    </div>
   );
 }

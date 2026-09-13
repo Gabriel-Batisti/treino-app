@@ -120,7 +120,7 @@ export default async function Inicio() {
 
       {pesos !== null && (
         <Link
-          href="/peso"
+          href="/corpo/medidas"
           className="mx-4 mt-3 rounded-2xl bg-card border border-border px-4 py-3.5 flex items-center justify-between gap-3"
         >
           <div>

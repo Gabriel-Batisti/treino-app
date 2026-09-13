@@ -93,7 +93,7 @@ export function FormFoto() {
       });
       if (!r.ok) throw new Error(r.error);
 
-      router.push("/fotos");
+      router.push("/corpo/fotos");
       router.refresh();
     } catch (e) {
       setErro(e instanceof Error ? e.message : "não foi possível salvar");
@@ -107,7 +107,7 @@ export function FormFoto() {
       <header className="pt-safe sticky top-0 z-30 bg-background/95 backdrop-blur border-b border-border">
         <div className="px-4 pt-3 pb-3 flex items-center gap-2">
           <Link
-            href="/fotos"
+            href="/corpo/fotos"
             aria-label="voltar"
             className="size-9 -ml-2 grid place-items-center text-muted text-2xl leading-none"
           >
