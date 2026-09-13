@@ -31,6 +31,10 @@ const cardioSchema = z.object({
   data_local: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   duracao_min: z.number().int().min(1).max(600),
   calorias: z.number().int().min(0).max(5000).nullable(),
+  // Os limites são os do check da 0005 (> 20 e < 260), exclusivos nas duas
+  // pontas: min(20) deixaria passar um 20 que o Postgres recusa, e o erro
+  // chegaria como falha de banco em vez de campo inválido.
+  fc_media: z.number().int().min(21).max(259).nullable(),
   distancia_km: z.number().min(0).max(500).nullable(),
   intensidade: z.enum(["leve", "moderado", "intenso"]).nullable(),
   notas: z.string().max(500).nullable(),

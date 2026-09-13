@@ -60,6 +60,7 @@ export function FormCardio() {
   const [agora, setAgora] = useState(() => Date.now());
   const [minutos, setMinutos] = useState(30);
   const [calorias, setCalorias] = useState("");
+  const [fcMedia, setFcMedia] = useState("");
   const [distancia, setDistancia] = useState("");
   const [intensidade, setIntensidade] = useState<Intensidade | null>("moderado");
   const [data, setData] = useState(hojeLocal());
@@ -150,6 +151,7 @@ export function FormCardio() {
       data_local: inicio != null ? hoje : data,
       duracao_min: duracao,
       calorias: numero(calorias) != null ? Math.round(numero(calorias)!) : null,
+      fc_media: numero(fcMedia) != null ? Math.round(numero(fcMedia)!) : null,
       distancia_km: numero(distancia),
       intensidade,
       notas: null,
@@ -264,7 +266,11 @@ export function FormCardio() {
           </section>
         )}
 
-        <section className="grid grid-cols-2 gap-3">
+        {/* Três colunas, não duas: no relógio a FC média vem junto com as
+            calorias, então anotar à mão deve ser igual de curto. O rótulo é
+            "FC média" e não "batimentos" porque o número é a média da
+            sessão — "batimentos" sozinho sugere o valor de agora. */}
+        <section className="grid grid-cols-3 gap-2">
           <div>
             <h2 className="text-[10px] uppercase tracking-wide text-muted">Calorias</h2>
             <input
@@ -272,7 +278,17 @@ export function FormCardio() {
               placeholder="kcal"
               value={calorias}
               onChange={(e) => setCalorias(e.target.value)}
-              className="mt-2 w-full rounded-xl bg-card border border-border px-3 py-4 text-center tabular-nums outline-none focus:border-accent"
+              className="mt-2 w-full rounded-xl bg-card border border-border px-2 py-4 text-center tabular-nums outline-none focus:border-accent"
+            />
+          </div>
+          <div>
+            <h2 className="text-[10px] uppercase tracking-wide text-muted">FC média</h2>
+            <input
+              inputMode="numeric"
+              placeholder="bpm"
+              value={fcMedia}
+              onChange={(e) => setFcMedia(e.target.value)}
+              className="mt-2 w-full rounded-xl bg-card border border-border px-2 py-4 text-center tabular-nums outline-none focus:border-accent"
             />
           </div>
           <div>
@@ -282,7 +298,7 @@ export function FormCardio() {
               placeholder="km"
               value={distancia}
               onChange={(e) => setDistancia(e.target.value)}
-              className="mt-2 w-full rounded-xl bg-card border border-border px-3 py-4 text-center tabular-nums outline-none focus:border-accent"
+              className="mt-2 w-full rounded-xl bg-card border border-border px-2 py-4 text-center tabular-nums outline-none focus:border-accent"
             />
           </div>
         </section>
