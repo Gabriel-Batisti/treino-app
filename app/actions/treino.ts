@@ -242,3 +242,112 @@ export async function excluirSessao(id: string): Promise<ResultadoAcao> {
   revalidatePath("/rotinas");
   return { ok: true, data: null };
 }
+
+const edicaoSchema = z.object({
+  id: z.uuid(),
+  nome: z.string().max(120).nullable(),
+  data_local: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  duracao_min: z.number().int().min(1).max(600),
+  // Os limites batem com os checks das migrations 0006/0001, que são
+  // exclusivos nas pontas: min(20) deixaria passar um valor que o Postgres
+  // recusa, e o erro chegaria como falha de banco em vez de campo inválido.
+  fc_media: z.number().int().min(21).max(259).nullable(),
+  fc_max: z.number().int().min(21).max(259).nullable(),
+  calorias: z.number().int().min(0).max(5000).nullable(),
+  notas: z.string().max(1000).nullable(),
+  series: z.array(
+    z.object({
+      id: z.uuid(),
+      peso_kg: z.number().min(0).max(1000).nullable(),
+      reps: z.number().int().min(0).max(999).nullable(),
+      excluir: z.boolean(),
+    }),
+  ),
+});
+
+/**
+ * Corrigir um treino já concluído.
+ *
+ * NÃO passa pela fila offline: registrar é coisa de academia, corrigir é coisa
+ * de sofá. Enfileirar a edição criaria a pergunta "e se a fila tiver a sessão
+ * inteira e uma edição dela?" — conflito que este app hoje não tem.
+ *
+ * `duracao_seg` é COLUNA GERADA (`fim_em - inicio_em`), então não dá pra
+ * escrever nela: quem muda é o `fim_em`. E `inicio_em` acompanha a data,
+ * preservando a hora do dia — sem isso, mudar o dia deixaria o treino ordenado
+ * pelo horário do dia antigo, e a timeline discordaria da data mostrada.
+ *
+ * `volume_kg` e `e1rm` das séries também são geradas: mexer no peso ou nas
+ * reps recalcula as duas sozinho, e o recorde se corrige junto.
+ */
+export async function atualizarSessao(payload: unknown): Promise<ResultadoAcao> {
+  const parsed = edicaoSchema.safeParse(payload);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "dados inválidos" };
+  }
+  const e = parsed.data;
+
+  const supabase = await createClient();
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) return { ok: false, error: "Sessão expirada. Faça login de novo." };
+
+  const { data: atual } = await supabase
+    .from("sessoes")
+    .select("id, inicio_em, data_local, sessao_exercicios(series(id))")
+    .eq("id", e.id)
+    .eq("user_id", auth.user.id)
+    .maybeSingle();
+
+  if (!atual) return { ok: false, error: "Treino não encontrado." };
+
+  // Mesma data? Mantém o instante original, com hora e tudo. Data nova? Vale a
+  // mesma hora do dia no novo dia — e, se o original não tinha hora crível,
+  // meio-dia local, que não escorrega pro dia anterior em UTC (D-012).
+  let inicio = new Date(atual.inicio_em);
+  if (e.data_local !== atual.data_local) {
+    const hora = atual.inicio_em.slice(11, 19);
+    inicio = new Date(`${e.data_local}T${hora || "12:00:00"}-03:00`);
+  }
+  const fim = new Date(inicio.getTime() + e.duracao_min * 60_000);
+
+  const { error: erroSessao } = await supabase
+    .from("sessoes")
+    .update({
+      nome: e.nome,
+      data_local: e.data_local,
+      inicio_em: inicio.toISOString(),
+      fim_em: fim.toISOString(),
+      fc_media: e.fc_media,
+      fc_max: e.fc_max,
+      calorias: e.calorias,
+      notas: e.notas,
+    })
+    .eq("id", e.id)
+    .eq("user_id", auth.user.id);
+
+  if (erroSessao) return { ok: false, error: erroSessao.message };
+
+  // Só séries DESTA sessão. A RLS já barraria a de outro usuário, mas nada
+  // impediria de mandar o id de uma série de outro treino seu.
+  const daSessao = new Set(
+    (atual.sessao_exercicios ?? []).flatMap((se) =>
+      ((se as { series?: { id: string }[] }).series ?? []).map((s) => s.id),
+    ),
+  );
+
+  for (const s of e.series) {
+    if (!daSessao.has(s.id)) continue;
+    const campos = s.excluir
+      ? // Exclusão é `excluido_em`, nunca delete (D-007). `concluida = false`
+        // junto porque é `concluida` que alimenta volume, recorde e o
+        // "anterior" — sem isso a série apagada continuaria contando.
+        { excluido_em: new Date().toISOString(), concluida: false }
+      : { peso_kg: s.peso_kg, reps: s.reps };
+    const { error } = await supabase.from("series").update(campos).eq("id", s.id);
+    if (error) return { ok: false, error: error.message };
+  }
+
+  revalidatePath("/");
+  revalidatePath(`/sessoes/${e.id}`);
+  return { ok: true, data: null };
+}

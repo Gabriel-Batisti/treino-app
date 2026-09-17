@@ -68,3 +68,63 @@ export async function salvarCardio(payload: unknown): Promise<ResultadoAcao> {
   revalidatePath("/");
   return { ok: true, data: null };
 }
+
+/**
+ * Corrigir um cardio já gravado.
+ *
+ * NÃO passa pela fila offline, diferente de `salvarCardio`. Registrar é coisa
+ * de academia, com sinal ruim; corrigir é coisa de sofá. Enfileirar a edição
+ * criaria a pergunta "e se a fila tiver um registro e uma edição da mesma
+ * linha?" — que é justamente o tipo de conflito que este app não tem hoje.
+ *
+ * `inicio_em` acompanha a data: sem isso, mudar o dia deixaria o registro no
+ * dia novo com o horário do antigo, e a ordenação da timeline (que usa
+ * `inicio_em`) discordaria da data mostrada.
+ */
+export async function atualizarCardio(payload: unknown): Promise<ResultadoAcao> {
+  const parsed = cardioSchema.safeParse(payload);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "dados inválidos" };
+  }
+
+  const supabase = await createClient();
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) return { ok: false, error: "Sessão expirada. Faça login de novo." };
+
+  const { id, ...campos } = parsed.data;
+
+  // `.eq("user_id")` além da RLS: cinto e suspensório, e deixa explícito na
+  // leitura do código que esta linha é sua.
+  const { error } = await supabase
+    .from("cardios")
+    .update({ ...campos, atualizado_em: new Date().toISOString() })
+    .eq("id", id)
+    .eq("user_id", auth.user.id)
+    .is("excluido_em", null);
+
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/");
+  revalidatePath(`/cardio/${id}`);
+  return { ok: true, data: null };
+}
+
+/** Exclusão é `excluido_em`, nunca delete (D-007). */
+export async function excluirCardio(id: string): Promise<ResultadoAcao> {
+  if (!z.uuid().safeParse(id).success) return { ok: false, error: "id inválido" };
+
+  const supabase = await createClient();
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) return { ok: false, error: "Sessão expirada. Faça login de novo." };
+
+  const { error } = await supabase
+    .from("cardios")
+    .update({ excluido_em: new Date().toISOString() })
+    .eq("id", id)
+    .eq("user_id", auth.user.id);
+
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/");
+  return { ok: true, data: null };
+}

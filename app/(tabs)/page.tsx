@@ -132,7 +132,14 @@ export default async function Inicio() {
           if (item.tipo === "cardio") {
             const c = item.dado;
             return (
-              <article key={c.id} className="rounded-2xl bg-card border border-border p-4">
+              // Link, e não `article`: era a única coisa na timeline sem tela
+              // própria — dava pra registrar a bike como esteira e conviver
+              // com o erro pra sempre.
+              <Link
+                key={c.id}
+                href={`/cardio/${c.id}`}
+                className="block rounded-2xl bg-card border border-border p-4"
+              >
                 <div className="flex items-baseline justify-between gap-3">
                   <h2 className="font-medium">
                     {ROTULO_CARDIO[c.tipo] ?? "Cardio"}
@@ -170,7 +177,7 @@ export default async function Inicio() {
                     </span>
                   )}
                 </div>
-              </article>
+              </Link>
             );
           }
 

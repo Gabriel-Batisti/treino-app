@@ -171,7 +171,13 @@ export default async function TreinoPage({ params }: PageProps<"/sessoes/[id]">)
         ))}
       </section>
 
-      <div className="mt-10 px-4">
+      <div className="mt-10 px-4 flex flex-col gap-3">
+        <Link
+          href={`/sessoes/${sessao.id}/editar`}
+          className="w-full rounded-2xl border border-border py-4 text-sm text-center"
+        >
+          Editar treino
+        </Link>
         <ExcluirTreino id={sessao.id} nome={sessao.nome ?? "este treino"} />
       </div>
 
