@@ -90,7 +90,20 @@ export default async function TreinoPage({ params }: PageProps<"/sessoes/[id]">)
           >
             ‹
           </Link>
-          <span className="text-sm font-medium truncate">{sessao.nome ?? "Treino"}</span>
+          <span className="flex-1 min-w-0 text-sm font-medium truncate">
+            {sessao.nome ?? "Treino"}
+          </span>
+          {/* Editar também AQUI, além do rodapé. O botão de baixo fica depois
+              da lista inteira de exercícios: num treino de seis exercícios são
+              duas telas de rolagem até ele, e quem não rola até o fim conclui
+              que editar não existe. O cabeçalho é sticky, então este está
+              sempre à vista. */}
+          <Link
+            href={`/sessoes/${sessao.id}/editar`}
+            className="shrink-0 -mr-1 px-2 py-1.5 text-sm text-accent"
+          >
+            Editar
+          </Link>
         </div>
       </header>
 

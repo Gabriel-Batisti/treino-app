@@ -1,7 +1,23 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import {
+  DndContext,
+  PointerSensor,
+  TouchSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { enfileirar } from "@/lib/local/db";
 import { sincronizar } from "@/lib/local/sync";
 import { hojeLocal, formatPeso, haQuantoTempo } from "@/lib/format";
@@ -152,7 +168,22 @@ export function SessaoAtiva({
   const [descansoAte, setDescansoAte] = useState<number | null>(null);
   /** Duração cheia do descanso atual, só pra desenhar a barra de progresso. */
   const [descansoTotal, setDescansoTotal] = useState(0);
-  const [seletorAberto, setSeletorAberto] = useState(false);
+  /**
+   * O seletor de exercício serve a dois propósitos, e precisa saber qual:
+   * ＋ Adicionar põe no fim da lista; "escolher outro" na tela de substituição
+   * troca NO LUGAR. Um booleano não distinguia os dois.
+   */
+  const [seletor, setSeletor] = useState<
+    { modo: "adicionar" } | { modo: "trocar"; exIdx: number } | null
+  >(null);
+
+  // TouchSensor com atraso: sem ele o dedo rolando a lista dispara o arrasto.
+  // O mesmo par de sensores da edição de rotina, de propósito — reordenar tem
+  // que se comportar igual nas duas telas.
+  const sensores = useSensors(
+    useSensor(TouchSensor, { activationConstraint: { delay: 220, tolerance: 8 } }),
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+  );
   /** null = não perguntou ainda. Mapa exercicioId -> incluir na rotina. */
   const [aAdicionarNaRotina, setAAdicionarNaRotina] = useState<Record<string, boolean> | null>(null);
   const [confirmandoDescarte, setConfirmandoDescarte] = useState(false);
@@ -420,6 +451,47 @@ export function SessaoAtiva({
   }
 
   /**
+   * Substituir por um exercício escolhido no catálogo, não entre os sugeridos.
+   *
+   * A sugestão cobre "a máquina está ocupada, me dá o equivalente". Não cobre
+   * "hoje eu quero outra coisa" — e cobrir isso com mais pontuação seria
+   * inventar intenção. Aqui a escolha é sua, e o app só faz a troca no lugar.
+   */
+  async function trocarPeloEscolhido(exIdx: number, e: ExercicioLocal) {
+    setSeletor(null);
+    await trocarExercicio(exIdx, {
+      exercicioId: e.id,
+      nome: e.nome,
+      nomeBusca: e.nomeBusca,
+      motivo: "escolhido por você",
+      usos: e.usos,
+    });
+  }
+
+  /**
+   * Reordenar exercícios no meio do treino — a máquina está ocupada e você faz
+   * o próximo antes.
+   *
+   * Vale SÓ PRA HOJE. A rotina não muda: ordem trocada por máquina ocupada é
+   * acidente do dia, não decisão de treino. Mudar a rotina de verdade é na
+   * tela de edição dela, onde a mudança é deliberada.
+   *
+   * O `id` da linha é o da SESSÃO (`ex.id`), não o do exercício: o mesmo
+   * exercício pode aparecer duas vezes no treino (pré e pós-exaustão), e dois
+   * itens com a mesma chave quebrariam o arrasto.
+   */
+  function aoSoltarExercicio(evento: DragEndEvent) {
+    const { active, over } = evento;
+    if (!over || active.id === over.id) return;
+    setExercicios((prev) => {
+      const de = prev.findIndex((e) => e.id === active.id);
+      const para = prev.findIndex((e) => e.id === over.id);
+      if (de < 0 || para < 0) return prev;
+      return arrayMove(prev, de, para);
+    });
+  }
+
+  /**
    * Tira uma série da sessão e renumera as de baixo.
    *
    * Renumerar importa: `indice` é o que casa a série com o "anterior" da
@@ -451,7 +523,7 @@ export function SessaoAtiva({
    * mudança de plano. Editar a rotina é outra ação, em outra tela.
    */
   async function addExercicio(e: ExercicioLocal) {
-    setSeletorAberto(false);
+    setSeletor(null);
 
     // BUSCA O "ANTERIOR" (D-005). Sem isto, adicionar um exercício que você já
     // fez 61 vezes mostrava "—" no lugar da carga da última sessão — o
@@ -695,7 +767,7 @@ export function SessaoAtiva({
           <div className="py-12 text-center">
             <p className="text-sm text-muted">Treino vazio.</p>
             <button
-              onClick={() => setSeletorAberto(true)}
+              onClick={() => setSeletor({ modo: "adicionar" })}
               className="mt-4 rounded-2xl bg-accent text-black font-semibold px-6 py-4 text-sm"
             >
               ＋ Adicionar exercício
@@ -703,13 +775,25 @@ export function SessaoAtiva({
           </div>
         )}
 
+        <DndContext
+          sensors={sensores}
+          collisionDetection={closestCenter}
+          onDragEnd={aoSoltarExercicio}
+        >
+          <SortableContext
+            items={exercicios.map((e) => e.id)}
+            strategy={verticalListSortingStrategy}
+          >
         {exercicios.map((ex, exIdx) => (
-          <section key={ex.id}>
+          <ExercicioArrastavel key={ex.id} id={ex.id}>
+            {(pegador) => (
+              <>
             <div className="flex items-center justify-between gap-2">
+              {pegador}
               {/* A imagem do movimento, do tamanho da miniatura do Heavy. É a
                   mesma base da tela de detalhe — já está no cache do service
                   worker, então não custa rede na academia. */}
-              <Ilustracao nomeBusca={normalizarNome(ex.nome)} className="size-10" />
+              <Ilustracao nomeBusca={normalizarNome(ex.nome)} className="size-9" />
               <h2 className="flex-1 min-w-0 font-medium text-accent truncate">{ex.nome}</h2>
               <div className="flex items-center gap-2 shrink-0">
                 {ex.anteriorEm && (
@@ -882,12 +966,16 @@ export function SessaoAtiva({
             >
               + Adicionar série
             </button>
-          </section>
+              </>
+            )}
+          </ExercicioArrastavel>
         ))}
+          </SortableContext>
+        </DndContext>
 
         {exercicios.length > 0 && (
           <button
-            onClick={() => setSeletorAberto(true)}
+            onClick={() => setSeletor({ modo: "adicionar" })}
             className="w-full rounded-2xl border border-dashed border-border py-4 text-sm text-muted"
           >
             ＋ Adicionar exercício
@@ -1084,10 +1172,8 @@ export function SessaoAtiva({
 
           <div className="flex-1 overflow-y-auto px-4 py-3">
             {trocando.opcoes.length === 0 ? (
-              <p className="py-10 text-center text-sm text-muted">
-                Não achei substituto entre os exercícios que você já fez.
-                <br />
-                Use &quot;＋ Adicionar exercício&quot; pra escolher outro.
+              <p className="py-8 text-center text-sm text-muted">
+                Não achei substituto parecido entre os exercícios que você já fez.
               </p>
             ) : (
               <ul className="flex flex-col gap-2">
@@ -1111,6 +1197,17 @@ export function SessaoAtiva({
                 ))}
               </ul>
             )}
+
+            {/* A SAÍDA PRA QUANDO A SUGESTÃO NÃO SERVE. Sem isto a lista era
+                um beco: ou um dos substitutos propostos, ou cancelar e montar
+                a troca na mão em dois passos. A sugestão responde "me dá o
+                equivalente"; isto responde "hoje eu quero outra coisa". */}
+            <button
+              onClick={() => setSeletor({ modo: "trocar", exIdx: trocando.exIdx })}
+              className="mt-3 w-full rounded-2xl border border-dashed border-border py-4 text-sm text-muted"
+            >
+              ＋ Escolher outro exercício
+            </button>
 
             <p className="mt-4 text-[11px] text-muted">
               A troca vale só pra hoje. No fim do treino o app pergunta se ela
@@ -1156,10 +1253,14 @@ export function SessaoAtiva({
         </div>
       )}
 
-      {seletorAberto && (
+      {seletor && (
         <SeletorExercicio
-          aoEscolher={addExercicio}
-          aoFechar={() => setSeletorAberto(false)}
+          aoEscolher={(e) =>
+            seletor.modo === "trocar"
+              ? void trocarPeloEscolhido(seletor.exIdx, e)
+              : void addExercicio(e)
+          }
+          aoFechar={() => setSeletor(null)}
           jaNaSessao={exercicios.map((e) => e.exercicioId)}
         />
       )}
@@ -1213,5 +1314,56 @@ export function SessaoAtiva({
         </div>
       )}
     </main>
+  );
+}
+
+/**
+ * Um exercício da sessão, arrastável pelo ⠿.
+ *
+ * ARRASTO PELO PEGADOR, e não pelo bloco inteiro: dentro do bloco tem campo de
+ * peso, campo de reps, botão de ✓ e o deslize-pra-excluir da série. Ativar o
+ * arrasto por pressão longa em qualquer lugar transformaria "segurei o campo
+ * de peso um instante a mais" em reordenação acidental no meio do treino.
+ *
+ * Existe como componente porque `useSortable` é hook: não dá pra chamar dentro
+ * de um `.map()` no meio do JSX. O `children` é função pra devolver o pegador
+ * pro lugar certo do cabeçalho, sem ter que extrair as 250 linhas do bloco.
+ */
+function ExercicioArrastavel({
+  id,
+  children,
+}: {
+  id: string;
+  children: (pegador: ReactNode) => ReactNode;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+  });
+
+  const pegador = (
+    <button
+      {...attributes}
+      {...listeners}
+      aria-label="reordenar exercício"
+      // `touch-none` é obrigatório: sem ele o navegador rola a página no
+      // mesmo gesto e o arrasto nunca começa no celular.
+      className="size-8 -ml-1 shrink-0 grid place-items-center text-muted touch-none cursor-grab active:cursor-grabbing"
+    >
+      ⠿
+    </button>
+  );
+
+  return (
+    <section
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={
+        isDragging
+          ? "relative z-10 rounded-2xl bg-card ring-2 ring-accent px-3 py-2 -mx-3 shadow-lg"
+          : undefined
+      }
+    >
+      {children(pegador)}
+    </section>
   );
 }
