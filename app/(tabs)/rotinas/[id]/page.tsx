@@ -131,7 +131,10 @@ export default async function RotinaPage({ params }: PageProps<"/rotinas/[id]">)
           {itens.map((i) => {
             const ex = i.exercicios!;
             const pesos = pesoPorExercicio.get(ex.id);
-            const qtd = Math.max(i.series_alvo ?? 0, pesos?.size ?? 0, 1);
+            // O alvo manda. Só quem NÃO tem alvo (rotina importada do Heavy)
+            // cai no histórico — senão a tela mostraria 3 séries num exercício
+            // que o coach prescreveu com 2.
+            const qtd = i.series_alvo ?? Math.max(pesos?.size ?? 0, 1);
             const linhas: LinhaSerieAlvo[] = Array.from({ length: qtd }, (_, k) => ({
               indice: k + 1,
               pesoAnterior: pesos?.get(k + 1) ?? null,

@@ -132,9 +132,23 @@ function novaSerie(indice: number, tipo: TipoSerie = "normal"): SerieEmAndamento
   };
 }
 
-/** Quantidade de linhas = alvo da rotina, ou o que foi feito da última vez. */
+/**
+ * Quantidade de linhas = O ALVO, e ponto.
+ *
+ * Antes era `max(alvo, quantas você fez da última vez)`, o que fazia sentido
+ * quando rotina nenhuma tinha alvo: as importadas do Heavy vinham vazias, e o
+ * histórico era a única pista. Com prescrição de coach isso vira erro — ele
+ * pede 2 séries, você fez 3 na semana passada, e a tela mostrava 3
+ * contradizendo o treino. O histórico não pode ganhar da prescrição.
+ *
+ * Quem não tem alvo continua caindo no histórico: a conta mora em
+ * `sessao-cliente`, onde ainda se sabe se o alvo existia ou não.
+ *
+ * Fazer uma série a mais continua a um toque em "+ Adicionar série", e o fim
+ * do treino pergunta se aquilo deve virar parte da rotina.
+ */
 function montarExercicio(e: ExercicioDaSessao): ExercicioEmAndamento {
-  const qtd = Math.max(e.seriesAlvo, e.anterior.length, 1);
+  const qtd = Math.max(e.seriesAlvo, 1);
   // As ÚLTIMAS são as backup. Se o histórico tiver mais séries que o alvo, as
   // extras entram como normais no meio e a backup continua sendo a do fim —
   // que é onde ela é feita.
