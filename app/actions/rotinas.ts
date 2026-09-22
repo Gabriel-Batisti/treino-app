@@ -230,3 +230,47 @@ export async function renomearRotina(payload: unknown): Promise<ResultadoAcao> {
   revalidatePath("/rotinas");
   return { ok: true, data: null };
 }
+
+/**
+ * Cria uma rotina vazia e devolve o id, pra tela já abrir a edição dela.
+ *
+ * DEVOLVE O ID em vez de redirecionar: a tela precisa dele pra navegar DEPOIS
+ * de sincronizar. A edição de rotina lê do IndexedDB (D-007), então navegar
+ * antes do pull deixaria a tela em "carregando…" pra sempre.
+ *
+ * O id vem do client pelo mesmo motivo de sempre (D-007): se a resposta se
+ * perder e o app tentar de novo, o upsert cai na mesma linha em vez de criar
+ * duas rotinas com o mesmo nome.
+ */
+export async function criarRotina(payload: unknown): Promise<ResultadoAcao<{ id: string }>> {
+  const parsed = z
+    .object({ id: z.uuid(), nome: z.string().trim().min(1).max(60) })
+    .safeParse(payload);
+  if (!parsed.success) return { ok: false, error: "nome inválido" };
+
+  const supabase = await createClient();
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) return { ok: false, error: "Sessão expirada. Faça login de novo." };
+
+  // Entra no fim da lista. `ordem` desempata a listagem, e duas rotinas com a
+  // mesma ordem apareceriam em ordem arbitrária entre uma abertura e outra.
+  const { data: ultima } = await supabase
+    .from("rotinas")
+    .select("ordem")
+    .eq("user_id", auth.user.id)
+    .order("ordem", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const { error } = await supabase.from("rotinas").upsert({
+    id: parsed.data.id,
+    user_id: auth.user.id,
+    nome: parsed.data.nome,
+    ordem: (ultima?.ordem ?? -1) + 1,
+  });
+
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/rotinas");
+  return { ok: true, data: { id: parsed.data.id } };
+}

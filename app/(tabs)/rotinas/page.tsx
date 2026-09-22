@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ListaRotinas, type RotinaDaLista } from "./lista-rotinas";
+import { NovaRotina } from "./nova-rotina";
 import { lerRotinas } from "@/lib/local/db";
 
 /**
@@ -61,7 +62,9 @@ export default function Rotinas() {
         </Link>
       </div>
 
-      <h2 className="mt-6 text-lg font-medium">Rotinas</h2>
+      <div className="mt-6 flex items-baseline justify-between gap-3">
+        <h2 className="text-lg font-medium">Rotinas</h2>
+      </div>
 
       {rotinas === null ? (
         <p className="py-10 text-center text-sm text-muted">carregando…</p>
@@ -69,11 +72,15 @@ export default function Rotinas() {
         <p className="py-10 text-center text-sm text-muted">
           Nenhuma rotina no aparelho ainda.
           <br />
-          Abra o app com internet uma vez pra baixar.
+          Abra o app com internet pra baixar, ou crie uma abaixo.
         </p>
       ) : (
         <ListaRotinas rotinas={rotinas} />
       )}
+
+      <div className="mt-3 flex flex-col">
+        <NovaRotina />
+      </div>
 
       <div className="h-6" />
     </main>
