@@ -1,24 +1,48 @@
 /**
  * Agrupamento das rotinas.
  *
- * O usuário mantém dois blocos: os treinos de LETRA (Treino A-E, o bloco
- * antigo) e os de NÚMERO (Treino 1-5, o atual). Ele chama o primeiro de
- * "Muscle lab".
+ * VOCABULÁRIO, que é o que estava errado antes: uma linha de `rotinas` é UM
+ * TREINO ("Treino A"). O que o usuário chama de rotina é o PROGRAMA que
+ * contém os treinos — "Musclelab", com A a E dentro. O app tinha um nível
+ * onde ele tem dois.
  *
- * ⚠️ HEURÍSTICA PELO NOME, não coluna no banco. Foi escolha deliberada pra não
- * exigir mais uma migration manual — e é frágil: renomear "Treino A" pra
- * "Peito e tríceps" joga a rotina no outro grupo. Se isso incomodar, o conserto
- * é uma coluna `grupo` em `rotinas`.
+ * Antes isto era HEURÍSTICA PELO NOME (termina em letra → Muscle lab), com
+ * dois grupos fixos no código. Quebrou na primeira vez que entrou um programa
+ * novo: "Musclelab 2 — A" também termina em letra, e não havia como um
+ * terceiro grupo existir. Agora quem manda é `rotinas.grupo` (migration 0013).
  */
 
-export type GrupoRotina = "muscle_lab" | "minhas";
+export const SEM_GRUPO = "Treinos soltos";
 
-export const ROTULO_GRUPO: Record<GrupoRotina, string> = {
-  muscle_lab: "Muscle lab",
-  minhas: "Minhas rotinas",
-};
+export interface ParaAgrupar {
+  grupo: string | null;
+  ordem: number;
+}
 
-/** Termina em letra → Muscle lab. Qualquer outra coisa → Minhas rotinas. */
-export function grupoDaRotina(nome: string | null): GrupoRotina {
-  return /[a-zA-Z]$/.test((nome ?? "").trim()) ? "muscle_lab" : "minhas";
+export interface Grupo<T> {
+  nome: string;
+  itens: T[];
+}
+
+/**
+ * Agrupa preservando a ordem da lista: o grupo aparece onde seu primeiro
+ * treino aparece. Ordenar por nome jogaria "Musclelab" na frente de
+ * "Musclelab 2" — o programa velho acima do que você está fazendo hoje.
+ *
+ * Treino sem programa vai pro fim, sempre: é resto, não destaque.
+ */
+export function agruparRotinas<T extends ParaAgrupar>(rotinas: T[]): Grupo<T>[] {
+  const mapa = new Map<string, T[]>();
+  for (const r of [...rotinas].sort((a, b) => a.ordem - b.ordem)) {
+    const chave = r.grupo?.trim() || SEM_GRUPO;
+    const atual = mapa.get(chave);
+    if (atual) atual.push(r);
+    else mapa.set(chave, [r]);
+  }
+
+  const grupos = [...mapa].map(([nome, itens]) => ({ nome, itens }));
+  return [
+    ...grupos.filter((g) => g.nome !== SEM_GRUPO),
+    ...grupos.filter((g) => g.nome === SEM_GRUPO),
+  ];
 }

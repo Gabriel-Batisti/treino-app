@@ -12,9 +12,12 @@ interface ItemRotina {
   id: string;
   ordem: number;
   series_alvo: number | null;
+  /** Opcional: a 0012 pode não ter rodado, e a coluna vem undefined. */
+  series_backup?: number | null;
   reps_alvo_min: number | null;
   reps_alvo_max: number | null;
   descanso_seg: number | null;
+  notas?: string | null;
   exercicios: { id: string; nome: string; nome_busca: string; equipamento: string | null } | null;
 }
 
@@ -25,7 +28,7 @@ export default async function RotinaPage({ params }: PageProps<"/rotinas/[id]">)
   const { data: rotina } = await supabase
     .from("rotinas")
     .select(
-      "id, nome, notas, rotina_exercicios(id, ordem, series_alvo, reps_alvo_min, reps_alvo_max, descanso_seg, exercicios(id, nome, nome_busca, equipamento))",
+      "id, nome, notas, rotina_exercicios(id, ordem, series_alvo, series_backup, reps_alvo_min, reps_alvo_max, descanso_seg, notas, exercicios(id, nome, nome_busca, equipamento))",
     )
     // Filtra o filho embutido: sem isto, exercício removido da rotina
     // continuaria aparecendo (a exclusão é `excluido_em`, não delete — D-007).
@@ -112,7 +115,7 @@ export default async function RotinaPage({ params }: PageProps<"/rotinas/[id]">)
           href={`/sessao?rotina=${rotina.id}`}
           className="mt-3 block rounded-2xl bg-accent text-black font-semibold py-4 text-center"
         >
-          Iniciar rotina
+          Começar treino
         </Link>
       </div>
 
@@ -142,9 +145,11 @@ export default async function RotinaPage({ params }: PageProps<"/rotinas/[id]">)
                 nome={ex.nome}
                 nomeBusca={ex.nome_busca}
                 seriesAlvo={qtd}
+                seriesBackup={i.series_backup ?? 0}
                 repsAlvoMin={i.reps_alvo_min}
                 repsAlvoMax={i.reps_alvo_max}
                 descansoSeg={i.descanso_seg}
+                notas={i.notas ?? null}
                 linhas={linhas}
               />
             );

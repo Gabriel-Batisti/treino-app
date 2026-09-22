@@ -21,12 +21,15 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { reordenarRotinas, arquivarRotina } from "@/app/actions/rotinas";
-import { grupoDaRotina, ROTULO_GRUPO, type GrupoRotina } from "@/lib/treino/rotinas";
+import { agruparRotinas } from "@/lib/treino/rotinas";
 import { haQuantoTempo } from "@/lib/format";
 
 export interface RotinaDaLista {
   id: string;
   nome: string;
+  /** Programa a que este treino pertence. Null = treino solto. */
+  grupo: string | null;
+  ordem: number;
   exercicios: string[];
   ultimaVez: string | null;
   arquivada: boolean;
@@ -34,10 +37,12 @@ export interface RotinaDaLista {
 
 export function ListaRotinas({ rotinas: iniciais }: { rotinas: RotinaDaLista[] }) {
   const [rotinas, setRotinas] = useState(iniciais);
-  const [abertos, setAbertos] = useState<Record<GrupoRotina, boolean>>({
-    minhas: true,
-    muscle_lab: false,
-  });
+  /**
+   * Fechado por padrão, MENOS o primeiro. Com três programas de cinco treinos
+   * cada, tudo aberto são quinze cartões antes do que você veio fazer — e o
+   * primeiro grupo é o programa atual, porque a ordem segue `ordem`.
+   */
+  const [fechados, setFechados] = useState<Record<string, boolean>>({});
   const [mostrarOcultas, setMostrarOcultas] = useState(false);
   const [, iniciar] = useTransition();
 
@@ -50,7 +55,7 @@ export function ListaRotinas({ rotinas: iniciais }: { rotinas: RotinaDaLista[] }
   );
 
   const visiveis = rotinas.filter((r) => mostrarOcultas || !r.arquivada);
-  const porGrupo = (g: GrupoRotina) => visiveis.filter((r) => grupoDaRotina(r.nome) === g);
+  const grupos = agruparRotinas(visiveis);
   const ocultas = rotinas.filter((r) => r.arquivada).length;
 
   function aoSoltar(evento: DragEndEvent) {
@@ -81,27 +86,29 @@ export function ListaRotinas({ rotinas: iniciais }: { rotinas: RotinaDaLista[] }
   return (
     <DndContext sensors={sensores} collisionDetection={closestCenter} onDragEnd={aoSoltar}>
       <SortableContext items={rotinas.map((r) => r.id)} strategy={verticalListSortingStrategy}>
-        {(["minhas", "muscle_lab"] as GrupoRotina[]).map((g) => {
-          const doGrupo = porGrupo(g);
-          if (doGrupo.length === 0) return null;
+        {grupos.map((g, i) => {
+          const aberto = fechados[g.nome] === undefined ? i === 0 : !fechados[g.nome];
           return (
-            <section key={g} className="mt-4">
+            <section key={g.nome} className="mt-4">
               <button
-                onClick={() => setAbertos((a) => ({ ...a, [g]: !a[g] }))}
+                onClick={() => setFechados((f) => ({ ...f, [g.nome]: aberto }))}
                 className="w-full flex items-center gap-2 py-2 text-left"
-                aria-expanded={abertos[g]}
+                aria-expanded={aberto}
               >
-                <span className={`text-muted text-xs transition-transform ${abertos[g] ? "rotate-90" : ""}`}>
+                <span className={`text-muted text-xs transition-transform ${aberto ? "rotate-90" : ""}`}>
                   ▶
                 </span>
-                <span className="text-muted">
-                  {ROTULO_GRUPO[g]} ({doGrupo.length})
+                <span className={i === 0 ? "font-medium" : "text-muted"}>
+                  {g.nome}{" "}
+                  <span className="text-muted font-normal text-sm">
+                    ({g.itens.length} {g.itens.length === 1 ? "treino" : "treinos"})
+                  </span>
                 </span>
               </button>
 
-              {abertos[g] && (
+              {aberto && (
                 <div className="flex flex-col gap-3 mt-1">
-                  {doGrupo.map((r) => (
+                  {g.itens.map((r) => (
                     <CardRotina key={r.id} rotina={r} aoOcultar={alternarOculta} />
                   ))}
                 </div>
@@ -195,7 +202,7 @@ function CardRotina({
         href={`/sessao?rotina=${rotina.id}`}
         className="mt-3 block rounded-xl bg-accent text-black font-semibold py-3.5 text-center text-sm"
       >
-        Começar rotina
+        Começar treino
       </Link>
     </article>
   );

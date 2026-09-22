@@ -28,6 +28,8 @@ export default function Rotinas() {
         locais.map((r) => ({
           id: r.id,
           nome: r.nome,
+          grupo: r.grupo ?? null,
+          ordem: r.ordem,
           arquivada: r.arquivada,
           ultimaVez: r.ultimaVez,
           exercicios: r.exercicios.map((e) => e.nome),
@@ -79,7 +81,9 @@ export default function Rotinas() {
       )}
 
       <div className="mt-3 flex flex-col">
-        <NovaRotina />
+        <NovaRotina
+          grupos={[...new Set((rotinas ?? []).map((r) => r.grupo).filter((g): g is string => !!g))]}
+        />
       </div>
 
       <div className="h-6" />

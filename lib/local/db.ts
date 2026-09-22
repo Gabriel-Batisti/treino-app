@@ -18,6 +18,8 @@ const VERSAO = 2;
 export interface RotinaLocal {
   id: string;
   nome: string;
+  /** Programa a que este treino pertence ("Musclelab 2"). Null = solto. */
+  grupo?: string | null;
   ordem: number;
   arquivada: boolean;
   ultimaVez: string | null;
@@ -30,9 +32,17 @@ export interface RotinaLocal {
     modoMedicao: string;
     ordem: number;
     seriesAlvo: number | null;
+    /** Quantas das ÚLTIMAS séries são backup. Contadas dentro de seriesAlvo. */
+    seriesBackup?: number;
+    /** % da carga da última série de trabalho que a backup sugere. 70 = −30%. */
+    backupPctCarga?: number | null;
+    /** Descanso quando a PRÓXIMA série é backup. Curto de propósito. */
+    backupDescansoSeg?: number | null;
     repsAlvoMin: number | null;
     repsAlvoMax: number | null;
     descansoSeg: number | null;
+    /** Prescrição em texto: aproximação e regra da backup. Vem da rotina. */
+    notas?: string | null;
   }[];
 }
 

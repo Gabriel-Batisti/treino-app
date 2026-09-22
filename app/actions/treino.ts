@@ -40,6 +40,13 @@ const exercicioSchema = z.object({
 const sessaoSchema = z.object({
   id: z.uuid(),
   nome: z.string().nullable(),
+  /**
+   * De qual treino da rotina esta sessão saiu. Antes ninguém preenchia, e o
+   * "última vez" era casado por NOME — o que passou a errar no instante em que
+   * dois programas ganharam um "Treino A" cada: o treino novo nascia mostrando
+   * a data do velho. Nulo em treino livre e no histórico importado.
+   */
+  rotina_id: z.uuid().nullish(),
   inicio_em: z.iso.datetime({ offset: true }),
   fim_em: z.iso.datetime({ offset: true }),
   // Vem do RELÓGIO DO CELULAR, não de now() no servidor (D-012).
@@ -85,6 +92,7 @@ export async function salvarSessao(payload: unknown): Promise<ResultadoAcao> {
     id: s.id,
     user_id: auth.user.id,
     nome: s.nome,
+    rotina_id: s.rotina_id ?? null,
     inicio_em: s.inicio_em,
     fim_em: s.fim_em,
     data_local: s.data_local,

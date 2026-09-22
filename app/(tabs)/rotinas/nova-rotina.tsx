@@ -6,7 +6,7 @@ import { criarRotina } from "@/app/actions/rotinas";
 import { sincronizar } from "@/lib/local/sync";
 
 /**
- * Criar rotina — o caso "o coach mandou um treino novo".
+ * Criar um TREINO — o caso "o coach mandou o treino novo".
  *
  * Cria VAZIA e manda direto pra edição, onde os exercícios entram. Pedir nome
  * e exercícios na mesma tela duplicaria a busca de exercício, o stepper de
@@ -21,22 +21,29 @@ import { sincronizar } from "@/lib/local/sync";
  * não de academia — e uma rotina só local não teria id do servidor pros
  * exercícios se pendurarem.
  */
-export function NovaRotina() {
+export function NovaRotina({ grupos }: { grupos: string[] }) {
   const router = useRouter();
   const [aberto, setAberto] = useState(false);
   const [nome, setNome] = useState("");
+  /**
+   * O programa é o MESMO CAMPO pra escolher um existente e pra criar um novo:
+   * os botões preenchem o texto, e digitar outra coisa cria. Separar em
+   * "escolher" e "criar programa" seria um passo a mais pra alimentar uma
+   * tabela que a 0013 decidiu não existir — o programa é só um rótulo.
+   */
+  const [grupo, setGrupo] = useState(grupos[0] ?? "");
   const [criando, setCriando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
   async function criar() {
     const limpo = nome.trim();
-    if (!limpo) return setErro("Dê um nome pra rotina.");
+    if (!limpo) return setErro("Dê um nome pro treino.");
 
     setCriando(true);
     setErro(null);
 
     const id = crypto.randomUUID();
-    const r = await criarRotina({ id, nome: limpo }).catch(() => ({
+    const r = await criarRotina({ id, nome: limpo, grupo: grupo.trim() || null }).catch(() => ({
       ok: false as const,
       error: "Sem conexão. Criar rotina precisa de internet.",
     }));
@@ -58,26 +65,58 @@ export function NovaRotina() {
         className="rounded-2xl bg-card border border-border py-4 flex items-center justify-center gap-2 text-sm"
       >
         <span className="text-accent text-lg leading-none">＋</span>
-        Nova rotina
+        Novo treino
       </button>
     );
   }
 
   return (
     <div className="rounded-2xl bg-card border border-border p-4">
-      <label className="text-[10px] uppercase tracking-wide text-muted" htmlFor="nome-rotina">
-        Nome da rotina
+      <label className="text-[10px] uppercase tracking-wide text-muted" htmlFor="nome-treino">
+        Nome do treino
       </label>
       <input
-        id="nome-rotina"
+        id="nome-treino"
         autoFocus
         value={nome}
         maxLength={60}
-        placeholder="Treino A"
+        placeholder="Treino B"
         onChange={(e) => setNome(e.target.value)}
         onKeyDown={(e) => e.key === "Enter" && void criar()}
         className="mt-1 w-full rounded-xl bg-background border border-border px-3 py-3.5 outline-none focus:border-accent"
       />
+
+      <label className="mt-3 block text-[10px] uppercase tracking-wide text-muted" htmlFor="grupo">
+        Rotina
+      </label>
+      {grupos.length > 0 && (
+        <div className="mt-1 flex flex-wrap gap-1.5">
+          {grupos.map((g) => (
+            <button
+              key={g}
+              onClick={() => setGrupo(g)}
+              className={`rounded-lg border px-2.5 py-1.5 text-[11px] ${
+                grupo === g
+                  ? "bg-accent text-black border-accent font-medium"
+                  : "bg-background border-border text-muted"
+              }`}
+            >
+              {g}
+            </button>
+          ))}
+        </div>
+      )}
+      <input
+        id="grupo"
+        value={grupo}
+        maxLength={60}
+        placeholder="Musclelab 2"
+        onChange={(e) => setGrupo(e.target.value)}
+        className="mt-1.5 w-full rounded-xl bg-background border border-border px-3 py-3 text-sm outline-none focus:border-accent"
+      />
+      <p className="mt-1 text-[11px] text-muted">
+        Nome novo aqui cria uma rotina nova. Em branco, o treino fica solto.
+      </p>
 
       {erro && <p className="mt-2 text-sm text-red-400">{erro}</p>}
 

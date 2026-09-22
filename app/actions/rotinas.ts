@@ -244,7 +244,15 @@ export async function renomearRotina(payload: unknown): Promise<ResultadoAcao> {
  */
 export async function criarRotina(payload: unknown): Promise<ResultadoAcao<{ id: string }>> {
   const parsed = z
-    .object({ id: z.uuid(), nome: z.string().trim().min(1).max(60) })
+    .object({
+      id: z.uuid(),
+      nome: z.string().trim().min(1).max(60),
+      // O programa é TEXTO LIVRE, não uma escolha entre os que existem: criar
+      // treino no programa novo e criar o programa são a mesma ação. Um passo
+      // separado de "criar programa" só existiria pra encher uma tabela que a
+      // 0013 decidiu não ter.
+      grupo: z.string().trim().max(60).nullish(),
+    })
     .safeParse(payload);
   if (!parsed.success) return { ok: false, error: "nome inválido" };
 
@@ -252,20 +260,27 @@ export async function criarRotina(payload: unknown): Promise<ResultadoAcao<{ id:
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) return { ok: false, error: "Sessão expirada. Faça login de novo." };
 
-  // Entra no fim da lista. `ordem` desempata a listagem, e duas rotinas com a
-  // mesma ordem apareceriam em ordem arbitrária entre uma abertura e outra.
-  const { data: ultima } = await supabase
+  // Entra no fim do PROGRAMA, não no fim da lista: o Treino B tem que nascer
+  // colado no Treino A, e não depois dos treinos soltos lá embaixo. `ordem`
+  // também desempata a listagem — duas linhas com a mesma ordem apareceriam
+  // em ordem arbitrária entre uma abertura e outra.
+  const grupo = parsed.data.grupo?.trim() || null;
+  const consulta = supabase
     .from("rotinas")
     .select("ordem")
     .eq("user_id", auth.user.id)
     .order("ordem", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .limit(1);
+  const { data: ultima } = await (grupo
+    ? consulta.eq("grupo", grupo)
+    : consulta.is("grupo", null)
+  ).maybeSingle();
 
   const { error } = await supabase.from("rotinas").upsert({
     id: parsed.data.id,
     user_id: auth.user.id,
     nome: parsed.data.nome,
+    grupo,
     ordem: (ultima?.ordem ?? -1) + 1,
   });
 

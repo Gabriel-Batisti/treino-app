@@ -58,18 +58,44 @@ export interface ExercicioDaSessao {
   nome: string;
   modoMedicao: string;
   seriesAlvo: number;
+  /** Quantas das ÚLTIMAS séries são backup. Contadas dentro de seriesAlvo. */
+  seriesBackup: number;
+  /** % da carga da última série de trabalho que a backup sugere. 70 = −30%. */
+  backupPctCarga: number | null;
+  /** Descanso quando a PRÓXIMA série é backup. Curto de propósito. */
+  backupDescansoSeg: number | null;
   repsAlvoMin: number | null;
   repsAlvoMax: number | null;
   descansoSeg: number | null;
+  /**
+   * A prescrição escrita pelo coach, vinda da rotina. SÓ LEITURA aqui — é
+   * diferente de `notas`, que é o que VOCÊ escreve durante o treino.
+   */
+  notasRotina: string | null;
   anterior: SerieAnterior[];
   anteriorEm: string | null;
   /** Maior carga já feita neste exercício. Null = sem histórico ou sem a 0002. */
   recordePesoKg: number | null;
 }
 
+/**
+ * `series.tipo` do banco aceita cinco valores desde a 0001. A sessão usa dois:
+ * a série que conta e a backup. Aquecimento não vira linha — é comentário na
+ * rotina, porque carga de aquecimento não entra em volume nem em recorde.
+ */
+type TipoSerie = "normal" | "backoff";
+
 interface SerieEmAndamento {
   id: string;
   indice: number;
+  tipo: TipoSerie;
+  /**
+   * O peso da backup é DERIVADO da última série de trabalho — mas só até você
+   * digitar. Sem esta marca, a sugestão sobrescreveria o que você escreveu na
+   * próxima vez que a carga de trabalho mudasse, e você perderia o número
+   * digitado sem entender por quê.
+   */
+  pesoManual?: boolean;
   pesoKg: number | null;
   /**
    * O que está literalmente digitado no campo de peso, enquanto se digita.
@@ -94,10 +120,11 @@ interface ExercicioEmAndamento extends ExercicioDaSessao {
   foraDaRotina?: boolean;
 }
 
-function novaSerie(indice: number): SerieEmAndamento {
+function novaSerie(indice: number, tipo: TipoSerie = "normal"): SerieEmAndamento {
   return {
     id: crypto.randomUUID(),
     indice,
+    tipo,
     pesoKg: null,
     reps: null,
     concluida: false,
@@ -108,18 +135,55 @@ function novaSerie(indice: number): SerieEmAndamento {
 /** Quantidade de linhas = alvo da rotina, ou o que foi feito da última vez. */
 function montarExercicio(e: ExercicioDaSessao): ExercicioEmAndamento {
   const qtd = Math.max(e.seriesAlvo, e.anterior.length, 1);
+  // As ÚLTIMAS são as backup. Se o histórico tiver mais séries que o alvo, as
+  // extras entram como normais no meio e a backup continua sendo a do fim —
+  // que é onde ela é feita.
+  const primeiraBackup = qtd - Math.min(e.seriesBackup, qtd);
   return {
     ...e,
     id: crypto.randomUUID(),
     notas: "",
     series: Array.from({ length: qtd }, (_, i) => {
-      const s = novaSerie(i + 1);
+      const s = novaSerie(i + 1, i >= primeiraBackup ? "backoff" : "normal");
       // Peso entra PREENCHIDO (raramente muda). Reps fica como placeholder —
       // preencher os dois faria você registrar série que não fez.
       s.pesoKg = e.anterior[i]?.pesoKg ?? e.anterior[e.anterior.length - 1]?.pesoKg ?? null;
       return s;
     }),
   };
+}
+
+/** Igual ao de cima, mas já com o peso das backups derivado do histórico. */
+function montarComBackup(e: ExercicioDaSessao): ExercicioEmAndamento {
+  const ex = montarExercicio(e);
+  recalcularBackups(ex);
+  return ex;
+}
+
+/**
+ * Recalcula o peso das backups a partir da última série de TRABALHO que tem
+ * carga — a mais recente que você tocou, concluída ou não, pra a sugestão
+ * andar junto enquanto você ainda está decidindo o peso.
+ *
+ * Arredonda em 0,5 kg. Não em 2,5: a máquina pode ter passo de 5 e o halter de
+ * 1, e arredondar pro passo errado dá um número que também não existe. 0,5 é o
+ * mais perto do que a conta manda; ajustar é um toque.
+ *
+ * Muta o exercício recebido de propósito — é sempre chamada dentro de uma
+ * cópia feita pelo `setExercicios`.
+ */
+function recalcularBackups(ex: ExercicioEmAndamento): void {
+  if (!ex.backupPctCarga) return;
+  const trabalho = ex.series.filter((s) => s.tipo !== "backoff" && s.pesoKg != null);
+  const base = trabalho[trabalho.length - 1]?.pesoKg;
+  if (base == null) return;
+  const sugerido = Math.round((base * ex.backupPctCarga) / 100 / 0.5) * 0.5;
+  for (const s of ex.series) {
+    if (s.tipo === "backoff" && !s.pesoManual && !s.concluida) {
+      s.pesoKg = sugerido;
+      s.pesoTexto = undefined;
+    }
+  }
 }
 
 function mmss(seg: number): string {
@@ -147,7 +211,7 @@ export function SessaoAtiva({
   const router = useRouter();
   const inicioRef = useRef(new Date().toISOString());
   const [exercicios, setExercicios] = useState<ExercicioEmAndamento[]>(() =>
-    exerciciosIniciais.map(montarExercicio),
+    exerciciosIniciais.map(montarComBackup),
   );
   const [salvando, setSalvando] = useState(false);
   // Painel do fim do treino: métricas do relógio e, se for o caso, a rotina.
@@ -317,6 +381,11 @@ export function SessaoAtiva({
         // o volume do treino piscar pra trás a cada tecla.
         if (Number.isFinite(n)) serie.pesoKg = n;
       }
+      // Digitou NA backup: a partir de agora o número é seu, e a sugestão para
+      // de mexer nele. Digitou numa série de trabalho: a backup acompanha, em
+      // tempo real, sem esperar você marcar o ✓.
+      if (serie.tipo === "backoff") serie.pesoManual = limpo !== "";
+      else recalcularBackups(cp[exIdx]);
       return cp;
     });
   }, []);
@@ -390,9 +459,18 @@ export function SessaoAtiva({
       return cp;
     });
 
-    if (vaiConcluir && exAtual.descansoSeg) {
-      setDescansoAte(Date.now() + exAtual.descansoSeg * 1000);
-      setDescansoTotal(exAtual.descansoSeg);
+    // A PRÓXIMA série é backup? Então o descanso é o curto da prescrição, não
+    // o das séries de trabalho. O coach pede 30s de propósito: é pra chegar na
+    // backup ainda fatigado, e o timer de 2 min desmontaria o estímulo.
+    const proxima = exAtual.series[sIdx + 1];
+    const descanso =
+      proxima?.tipo === "backoff" && exAtual.backupDescansoSeg != null
+        ? exAtual.backupDescansoSeg
+        : exAtual.descansoSeg;
+
+    if (vaiConcluir && descanso) {
+      setDescansoAte(Date.now() + descanso * 1000);
+      setDescansoTotal(descanso);
     }
     navigator.vibrate?.(30);
   }
@@ -542,6 +620,12 @@ export function SessaoAtiva({
         modoMedicao: e.modoMedicao,
         recordePesoKg,
         seriesAlvo: quantasSeries,
+        // Entrou no meio do treino, fora da rotina: não há prescrição de
+        // backup nem nota de coach pra herdar.
+        seriesBackup: 0,
+        backupPctCarga: null,
+        backupDescansoSeg: null,
+        notasRotina: null,
         repsAlvoMin: null,
         repsAlvoMax: null,
         // Herda o descanso do exercício anterior: o padrão do treino de hoje
@@ -651,6 +735,9 @@ export function SessaoAtiva({
     const payload = {
       id: sessaoId,
       nome: nomeRotina,
+      // Qual treino da rotina gerou esta sessão. É o que faz o "última vez"
+      // parar de casar por nome — dois programas podem ter um "Treino A".
+      rotina_id: rotinaId,
       inicio_em: inicioRef.current,
       fim_em: new Date().toISOString(),
       data_local: hojeLocal(),
@@ -669,7 +756,7 @@ export function SessaoAtiva({
         series: e.series.map((s) => ({
           id: s.id,
           indice: s.indice,
-          tipo: "normal" as const,
+          tipo: s.tipo,
           peso_kg: s.pesoKg,
           reps: s.reps,
           rpe: null,
@@ -813,6 +900,17 @@ export function SessaoAtiva({
               </div>
             </div>
 
+            {/* A PRESCRIÇÃO DO COACH, só leitura. Fica ACIMA do campo de
+                notas e antes das séries porque é o que você lê ANTES de
+                começar: as séries de aproximação acontecem antes da primeira
+                linha da tabela existir. `whitespace-pre-line` preserva as
+                quebras — uma linha por etapa, não um parágrafo corrido. */}
+            {ex.notasRotina && (
+              <p className="mt-1.5 rounded-xl border border-border bg-card px-3 py-2.5 text-[11px] leading-relaxed text-muted whitespace-pre-line">
+                {ex.notasRotina}
+              </p>
+            )}
+
             <input
               value={ex.notas}
               placeholder="Adicione notas aqui…"
@@ -852,6 +950,7 @@ export function SessaoAtiva({
                   ex.recordePesoKg != null &&
                   s.pesoKg > ex.recordePesoKg;
                 const dx = deslize?.id === s.id ? deslize.dx : 0;
+                const backup = s.tipo === "backoff";
                 return (
                   <div key={s.id} className="relative">
                     {/* Fundo que aparece conforme a linha sai da frente. */}
@@ -906,8 +1005,19 @@ export function SessaoAtiva({
                           : "bg-background"
                       }`}
                     >
-                    <span className="text-center text-xs text-muted tabular-nums">
-                      {recorde ? <span aria-label="recorde">🏅</span> : s.indice}
+                    {/* A backup se identifica NA COLUNA DO NÚMERO, não numa
+                        etiqueta ao lado: é a única coluna estreita que já
+                        existe, e a linha da série não tem folga pra mais nada
+                        num iPhone. "B" no lugar do número diz o que é sem
+                        custar largura. Recorde continua ganhando da marcação —
+                        medalha é notícia, "é backup" é contexto. */}
+                    <span
+                      className={`text-center text-xs tabular-nums ${
+                        backup ? "text-amber-400 font-medium" : "text-muted"
+                      }`}
+                      title={backup ? "série backup" : undefined}
+                    >
+                      {recorde ? <span aria-label="recorde">🏅</span> : backup ? "B" : s.indice}
                     </span>
 
                     {/* O "anterior" — a informação mais importante da tela. */}
@@ -1079,11 +1189,11 @@ export function SessaoAtiva({
 
             {aAdicionarNaRotina !== null && (
             <>
-            <h2 className="mt-8 text-xl font-semibold tracking-tight">Atualizar a rotina?</h2>
+            <h2 className="mt-8 text-xl font-semibold tracking-tight">Atualizar o treino?</h2>
             <p className="mt-2 text-sm text-muted">
               {extrasDaRotina().length === 1 ? "Este exercício não estava" : "Estes exercícios não estavam"}{" "}
               em <span className="text-foreground">{nomeRotina}</span>. Marque o que deve passar a
-              fazer parte dela.
+              fazer parte dele.
             </p>
 
             <ul className="mt-5 flex flex-col gap-2">

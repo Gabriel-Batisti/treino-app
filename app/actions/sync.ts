@@ -14,13 +14,27 @@ import type { UltimoDesempenho } from "@/types/app";
  * Arquivo "use server" só exporta função async.
  */
 
+interface LinhaRotina {
+  id: string;
+  nome: string;
+  grupo?: string | null;
+  ordem: number;
+  arquivada: boolean;
+  rotina_exercicios: ItemRotina[] | null;
+}
+
 interface ItemRotina {
   id: string;
   ordem: number;
   series_alvo: number | null;
+  /** Opcional: a 0012 pode não ter rodado, e a coluna vem undefined. */
+  series_backup?: number | null;
+  backup_pct_carga?: number | null;
+  backup_descanso_seg?: number | null;
   reps_alvo_min: number | null;
   reps_alvo_max: number | null;
   descanso_seg: number | null;
+  notas?: string | null;
   exercicios: { id: string; nome: string; nome_busca: string; modo_medicao: string } | null;
 }
 
@@ -39,6 +53,8 @@ export interface DadosLocais {
   rotinas: {
     id: string;
     nome: string;
+    /** Programa a que este treino pertence. Null = treino solto. */
+    grupo: string | null;
     ordem: number;
     arquivada: boolean;
     ultimaVez: string | null;
@@ -50,9 +66,13 @@ export interface DadosLocais {
       modoMedicao: string;
       ordem: number;
       seriesAlvo: number | null;
+      seriesBackup: number;
+      backupPctCarga: number | null;
+      backupDescansoSeg: number | null;
       repsAlvoMin: number | null;
       repsAlvoMax: number | null;
       descansoSeg: number | null;
+      notas: string | null;
     }[];
   }[];
   desempenho: {
@@ -72,16 +92,24 @@ export async function puxarDadosLocais(): Promise<
 
   const { data: ultimas } = await supabase
     .from("sessoes")
-    .select("nome, data_local")
+    .select("nome, rotina_id, data_local")
     .eq("status", "concluida")
     .order("inicio_em", { ascending: false })
     .limit(60);
 
-  // Casa por NOME — é o que liga rotina e histórico enquanto
-  // `sessoes.rotina_id` não é preenchido.
-  const ultimaVez = new Map<string, string>();
+  /**
+   * "Última vez" por ID primeiro, por NOME só como sobra.
+   *
+   * O nome sozinho passou a mentir quando dois programas ganharam um "Treino
+   * A" cada: o treino recém-criado nascia mostrando a data do homônimo velho,
+   * de março. Sessão gravada pelo app agora carrega `rotina_id` — o nome
+   * continua atendendo o histórico importado do Heavy, que não tem o vínculo.
+   */
+  const porId = new Map<string, string>();
+  const porNome = new Map<string, string>();
   for (const s of ultimas ?? []) {
-    if (s.nome && !ultimaVez.has(s.nome)) ultimaVez.set(s.nome, s.data_local);
+    if (s.rotina_id && !porId.has(s.rotina_id)) porId.set(s.rotina_id, s.data_local);
+    if (s.nome && !porNome.has(s.nome)) porNome.set(s.nome, s.data_local);
   }
 
   const { data: catalogo } = await supabase
@@ -89,24 +117,57 @@ export async function puxarDadosLocais(): Promise<
     .select("id, nome, nome_busca, grupo_muscular, equipamento, modo_medicao, usos, ultimo_uso_em")
     .eq("arquivado", false);
 
-  const { data: rotinas, error } = await supabase
+  /**
+   * Duas listas de colunas, e não uma.
+   *
+   * Pedir coluna que não existe faz o PostgREST devolver 400 — e aqui isso não
+   * seria "um campo a menos", seria o pull INTEIRO falhando: sem rotina no
+   * banco local, a tela de treino fica vazia e o app deixa de funcionar na
+   * academia. Foi o que aconteceu quando a 0012 entrou no código antes de
+   * rodar no banco.
+   *
+   * Como migration aqui é rodada à mão (e portanto pode atrasar em relação ao
+   * deploy), o pull tenta o conjunto novo e cai no antigo se ele não existir.
+   * Os campos que faltam viram null/0 na normalização abaixo.
+   */
+  // As duas listas ficam LITERAIS: o client do Supabase lê a string do select
+  // em tempo de tipo, e montar por template derruba a inferência inteira.
+  // Mesmo filtro nas duas: sem ele o banco local receberia exercício removido
+  // da rotina e a tela de treino o mostraria offline.
+  const nova = await supabase
     .from("rotinas")
     .select(
-      "id, nome, ordem, arquivada, rotina_exercicios(id, ordem, series_alvo, reps_alvo_min, reps_alvo_max, descanso_seg, exercicios(id, nome, nome_busca, modo_medicao))",
+      "id, nome, grupo, ordem, arquivada, rotina_exercicios(id, ordem, series_alvo, series_backup, backup_pct_carga, backup_descanso_seg, reps_alvo_min, reps_alvo_max, descanso_seg, notas, exercicios(id, nome, nome_busca, modo_medicao))",
     )
-    // Mesma coisa aqui: sem o filtro, o banco local receberia exercício
-    // removido da rotina e a tela de treino o mostraria offline.
     .is("rotina_exercicios.excluido_em", null)
     .order("ordem");
+
+  let rotinas = nova.data as unknown as LinhaRotina[] | null;
+  let error = nova.error;
+
+  if (error) {
+    const antiga = await supabase
+      .from("rotinas")
+      .select(
+        "id, nome, grupo, ordem, arquivada, rotina_exercicios(id, ordem, series_alvo, reps_alvo_min, reps_alvo_max, descanso_seg, notas, exercicios(id, nome, nome_busca, modo_medicao))",
+      )
+      .is("rotina_exercicios.excluido_em", null)
+      .order("ordem");
+    rotinas = antiga.data as unknown as LinhaRotina[] | null;
+    error = antiga.error;
+  }
   if (error) return { ok: false, error: error.message };
 
   const comExercicios = (rotinas ?? []).map((r) => ({
     id: r.id,
     nome: r.nome,
+    grupo: r.grupo ?? null,
     ordem: r.ordem,
     arquivada: r.arquivada,
-    ultimaVez: r.nome ? (ultimaVez.get(r.nome) ?? null) : null,
-    exercicios: ((r.rotina_exercicios ?? []) as unknown as ItemRotina[])
+    // Se ESTE treino já tem sessão própria, o nome nem é consultado: ele só
+    // responde por quem ainda não tem vínculo nenhum.
+    ultimaVez: porId.get(r.id) ?? (r.nome ? (porNome.get(r.nome) ?? null) : null),
+    exercicios: (r.rotina_exercicios ?? [])
       .filter((i) => i.exercicios)
       .sort((a, b) => a.ordem - b.ordem)
       .map((i) => ({
@@ -117,9 +178,15 @@ export async function puxarDadosLocais(): Promise<
         modoMedicao: i.exercicios!.modo_medicao,
         ordem: i.ordem,
         seriesAlvo: i.series_alvo,
+        // A 0012 pode não ter rodado ainda: sem ela a coluna volta undefined e
+        // 0 é o certo (nenhuma série é backup), não NaN.
+        seriesBackup: i.series_backup ?? 0,
+        backupPctCarga: i.backup_pct_carga ?? null,
+        backupDescansoSeg: i.backup_descanso_seg ?? null,
         repsAlvoMin: i.reps_alvo_min,
         repsAlvoMax: i.reps_alvo_max,
         descansoSeg: i.descanso_seg,
+        notas: i.notas ?? null,
       })),
   }));
 

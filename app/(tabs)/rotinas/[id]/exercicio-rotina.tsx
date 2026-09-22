@@ -27,9 +27,13 @@ export interface ExercicioRotinaProps {
   nome: string;
   nomeBusca: string;
   seriesAlvo: number;
+  /** Quantas das ÚLTIMAS séries são backup. Contadas dentro de seriesAlvo. */
+  seriesBackup: number;
   repsAlvoMin: number | null;
   repsAlvoMax: number | null;
   descansoSeg: number | null;
+  /** Prescrição escrita pelo coach. Só leitura. */
+  notas: string | null;
   linhas: LinhaSerieAlvo[];
 }
 
@@ -73,6 +77,12 @@ export function ExercicioRotina(props: ExercicioRotinaProps) {
         <span className="text-accent font-medium leading-tight">{props.nome}</span>
       </Link>
 
+      {props.notas && (
+        <p className="mt-2 rounded-xl border border-border bg-card px-3 py-2.5 text-[11px] leading-relaxed text-muted whitespace-pre-line">
+          {props.notas}
+        </p>
+      )}
+
       <div className="mt-2 relative">
         <button
           onClick={() => setAberto((v) => !v)}
@@ -104,16 +114,28 @@ export function ExercicioRotina(props: ExercicioRotinaProps) {
           <span className="text-center">Kg</span>
           <span className="text-center">Faixa de repetições</span>
         </div>
-        {props.linhas.map((l) => (
-          <div
-            key={l.indice}
-            className="grid grid-cols-[3rem_1fr_1fr] gap-2 py-2.5 border-b border-border/50 text-sm tabular-nums"
-          >
-            <span className="text-muted">{l.indice}</span>
-            <span className="text-center">{l.pesoAnterior != null ? formatPeso(l.pesoAnterior) : "—"}</span>
-            <span className="text-center">{faixa}</span>
-          </div>
-        ))}
+        {props.linhas.map((l) => {
+          // As ÚLTIMAS são backup — mesma regra da sessão, e tem que ser a
+          // mesma: a rotina prometendo uma coisa e o treino mostrando outra é
+          // pior que não marcar nada.
+          const backup = l.indice > props.linhas.length - props.seriesBackup;
+          return (
+            <div
+              key={l.indice}
+              className="grid grid-cols-[3rem_1fr_1fr] gap-2 py-2.5 border-b border-border/50 text-sm tabular-nums"
+            >
+              <span className={backup ? "text-amber-400 text-xs" : "text-muted"}>
+                {backup ? "backup" : l.indice}
+              </span>
+              <span className="text-center">
+                {l.pesoAnterior != null ? formatPeso(l.pesoAnterior) : "—"}
+              </span>
+              {/* A faixa de reps é das séries de TRABALHO. Backup costuma ser
+                  até a falha, então repetir "5-9" ali seria alvo mentiroso. */}
+              <span className="text-center">{backup ? "até a falha" : faixa}</span>
+            </div>
+          );
+        })}
       </div>
     </section>
   );

@@ -191,7 +191,7 @@ export function EditarRotina() {
           >
             ‹
           </Link>
-          <span className="text-sm font-medium">Editar rotina</span>
+          <span className="text-sm font-medium">Editar treino</span>
           <button
             onClick={() => router.push(`/rotinas/${rotinaId}`)}
             className="ml-auto rounded-full bg-accent text-black font-semibold px-5 py-2 text-sm"
