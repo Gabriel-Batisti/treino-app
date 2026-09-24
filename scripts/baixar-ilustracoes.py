@@ -49,7 +49,7 @@ MAPA = {
     # "De costas para a polia" não existe na base: a foto mostra a versão
     # de frente. O movimento do braço é o mesmo; o que muda é pra onde
     # você está virado, e é justamente isso que alonga o músculo.
-    "Rosca Direta de Costas (Cabo)": ("Standing Biceps Cable Curl", True),
+    "Rosca Direta de Costas (Barra W)": ("Standing Biceps Cable Curl", True),
     # É a extensão NORMAL na polia, só feita de costas — não o francês, que é
     # braço acima da cabeça e está mapeado em "Tríceps Francês (Polia)". A
     # primeira versão disto apontava pro francês e mostrava o movimento errado.
