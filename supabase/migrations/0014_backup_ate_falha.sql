@@ -21,6 +21,6 @@ alter table rotina_exercicios
   add column if not exists backup_ate_falha boolean not null default false;
 
 comment on column rotina_exercicios.backup_ate_falha is
-  'true = a série backup vai até a falha e ignora reps_alvo. false = ela tem
-   o mesmo alvo de reps das demais (caso do Muscle Round, onde os blocos do
-   drop também são de 4 reps).';
+  'true = a ÚLTIMA série do exercício vai até a falha e ignora reps_alvo. É a
+   última, não toda backup: no Muscle Round os dois blocos do drop têm carga
+   reduzida, mas só o sexto vai à falha — o quinto tem alvo de 4 reps.';

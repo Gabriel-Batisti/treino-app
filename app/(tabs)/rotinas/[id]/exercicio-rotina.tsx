@@ -34,7 +34,7 @@ export interface ExercicioRotinaProps {
   descansoSeg: number | null;
   /** Prescrição escrita pelo coach. Só leitura. */
   notas: string | null;
-  /** A backup vai até a falha e ignora a faixa de reps? */
+  /** A ÚLTIMA série vai até a falha e ignora a faixa de reps? */
   backupAteFalha: boolean;
   linhas: LinhaSerieAlvo[];
 }
@@ -133,14 +133,17 @@ export function ExercicioRotina(props: ExercicioRotinaProps) {
                 {l.pesoAnterior != null ? formatPeso(l.pesoAnterior) : "—"}
               </span>
               {/*
-                "até a falha" era FIXO aqui, e era verdade enquanto o único
-                backup era o do supino. Deixou de ser no primeiro Muscle
-                Round, onde os blocos do drop têm alvo de 4 reps como os
-                outros — e a tela passou a prometer falha em bloco que não
-                falha. Agora quem decide é a prescrição.
+                A falha é da ÚLTIMA SÉRIE, não de toda backup — foi o segundo
+                erro seguido aqui. Primeiro "até a falha" era texto fixo em
+                toda linha de backup; depois virou "toda backup deste
+                exercício", o que ainda estava errado no Muscle Round: dos
+                dois blocos do drop, só o sexto vai à falha, o quinto tem
+                alvo de 4 reps. Nos dois casos a falha é a última linha.
               */}
               <span className="text-center">
-                {backup && props.backupAteFalha ? "até a falha" : faixa}
+                {props.backupAteFalha && l.indice === props.linhas.length
+                  ? "até a falha"
+                  : faixa}
               </span>
             </div>
           );
