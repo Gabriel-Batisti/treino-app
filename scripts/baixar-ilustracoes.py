@@ -50,7 +50,10 @@ MAPA = {
     # de frente. O movimento do braço é o mesmo; o que muda é pra onde
     # você está virado, e é justamente isso que alonga o músculo.
     "Rosca Direta de Costas (Cabo)": ("Standing Biceps Cable Curl", True),
-    "Tríceps de Costas (Polia)": ("Cable Rope Overhead Triceps Extension", True),
+    # É a extensão NORMAL na polia, só feita de costas — não o francês, que é
+    # braço acima da cabeça e está mapeado em "Tríceps Francês (Polia)". A
+    # primeira versão disto apontava pro francês e mostrava o movimento errado.
+    "Tríceps de Costas (Polia)": ("Triceps Pushdown", True),
 
     "Abdominal Declinado": ("Decline Crunch", False),
     "Cadeira Extensora (Máquina)": ("Leg Extensions", False),
