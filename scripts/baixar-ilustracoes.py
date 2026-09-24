@@ -35,6 +35,20 @@ LARGURA = 420
 
 # nome do exercício do usuário -> (nome na free-exercise-db, é aproximação?)
 MAPA = {
+    # ── Musclelab 2: exercícios que o coach pediu e não existiam ──
+    # A corda de braço reto é o mesmo movimento, mesmo aparelho.
+    "Pulldown com Corda (Polia)": ("Rope Straight-Arm Pulldown", False),
+    "Remada Unilateral (Cabo)": ("Seated One-arm Cable Pulley Rows", False),
+    # Os três abaixo são APROXIMAÇÕES, e a UI vai dizer isso:
+    # a Helms Row tem ângulo de tronco e pausa próprios — a foto é da
+    # remada curvada comum, que é o movimento de onde ela sai.
+    "Helms Row (Pegada Pronada)": ("Bent Over Barbell Row", True),
+    # "De costas para a polia" não existe na base: a foto mostra a versão
+    # de frente. O movimento do braço é o mesmo; o que muda é pra onde
+    # você está virado, e é justamente isso que alonga o músculo.
+    "Rosca Direta de Costas (Cabo)": ("Standing Biceps Cable Curl", True),
+    "Tríceps de Costas (Polia)": ("Cable Rope Overhead Triceps Extension", True),
+
     "Abdominal Declinado": ("Decline Crunch", False),
     "Cadeira Extensora (Máquina)": ("Leg Extensions", False),
     "Crucifixo (Máquina)": ("Butterfly", False),
