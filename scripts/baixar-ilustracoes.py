@@ -40,6 +40,11 @@ MAPA = {
     "Pulldown com Corda (Polia)": ("Rope Straight-Arm Pulldown", False),
     "Remada Unilateral (Cabo)": ("Seated One-arm Cable Pulley Rows", False),
     "Elevação Frontal Banco Inclinado (Halter)": ("Front Incline Dumbbell Raise", False),
+    # Mesmo banco da hiperextensão lombar — o que muda é a INTENÇÃO: tronco
+    # ereto e força no glúteo, em vez de flexionar e estender a coluna. A base
+    # só tem a versão lombar, então a foto mostra o aparelho certo e o foco
+    # errado. Rotulada.
+    "Extensão de Quadril (Banco Romano)": ("Hyperextensions (Back Extensions)", True),
     # Ele faz a Helms Row com HALTER e pegada pronada, que é exatamente o
     # que esta entrada da base mostra — aparelho e pegada batem. O que a
     # Helms Row tem de próprio (ângulo de tronco e pausa) foto nenhuma
