@@ -39,10 +39,12 @@ MAPA = {
     # A corda de braço reto é o mesmo movimento, mesmo aparelho.
     "Pulldown com Corda (Polia)": ("Rope Straight-Arm Pulldown", False),
     "Remada Unilateral (Cabo)": ("Seated One-arm Cable Pulley Rows", False),
-    # Os três abaixo são APROXIMAÇÕES, e a UI vai dizer isso:
-    # a Helms Row tem ângulo de tronco e pausa próprios — a foto é da
-    # remada curvada comum, que é o movimento de onde ela sai.
-    "Helms Row (Pegada Pronada)": ("Bent Over Barbell Row", True),
+    # Ele faz a Helms Row com HALTER e pegada pronada, que é exatamente o
+    # que esta entrada da base mostra — aparelho e pegada batem. O que a
+    # Helms Row tem de próprio (ângulo de tronco e pausa) foto nenhuma
+    # mostraria, então não é caso de marcar aproximada.
+    "Helms Row (Halter)": ("Bent Over Two-Dumbbell Row", False),
+    # Os dois abaixo são APROXIMAÇÕES, e a UI vai dizer isso:
     # "De costas para a polia" não existe na base: a foto mostra a versão
     # de frente. O movimento do braço é o mesmo; o que muda é pra onde
     # você está virado, e é justamente isso que alonga o músculo.
