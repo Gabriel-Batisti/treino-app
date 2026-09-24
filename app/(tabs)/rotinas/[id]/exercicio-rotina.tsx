@@ -34,6 +34,8 @@ export interface ExercicioRotinaProps {
   descansoSeg: number | null;
   /** Prescrição escrita pelo coach. Só leitura. */
   notas: string | null;
+  /** A backup vai até a falha e ignora a faixa de reps? */
+  backupAteFalha: boolean;
   linhas: LinhaSerieAlvo[];
 }
 
@@ -130,9 +132,16 @@ export function ExercicioRotina(props: ExercicioRotinaProps) {
               <span className="text-center">
                 {l.pesoAnterior != null ? formatPeso(l.pesoAnterior) : "—"}
               </span>
-              {/* A faixa de reps é das séries de TRABALHO. Backup costuma ser
-                  até a falha, então repetir "5-9" ali seria alvo mentiroso. */}
-              <span className="text-center">{backup ? "até a falha" : faixa}</span>
+              {/*
+                "até a falha" era FIXO aqui, e era verdade enquanto o único
+                backup era o do supino. Deixou de ser no primeiro Muscle
+                Round, onde os blocos do drop têm alvo de 4 reps como os
+                outros — e a tela passou a prometer falha em bloco que não
+                falha. Agora quem decide é a prescrição.
+              */}
+              <span className="text-center">
+                {backup && props.backupAteFalha ? "até a falha" : faixa}
+              </span>
             </div>
           );
         })}
