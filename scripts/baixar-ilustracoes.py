@@ -39,6 +39,7 @@ MAPA = {
     # A corda de braço reto é o mesmo movimento, mesmo aparelho.
     "Pulldown com Corda (Polia)": ("Rope Straight-Arm Pulldown", False),
     "Remada Unilateral (Cabo)": ("Seated One-arm Cable Pulley Rows", False),
+    "Elevação Frontal Banco Inclinado (Halter)": ("Front Incline Dumbbell Raise", False),
     # Ele faz a Helms Row com HALTER e pegada pronada, que é exatamente o
     # que esta entrada da base mostra — aparelho e pegada batem. O que a
     # Helms Row tem de próprio (ângulo de tronco e pausa) foto nenhuma
