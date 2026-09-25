@@ -4,6 +4,7 @@ import { CartaoPeso } from "./cartao-peso";
 import { CalendarioMes, type DiaAtivo } from "@/components/calendario-mes";
 import { Ilustracao } from "@/components/ilustracao";
 import { hojeLocal, formatData, haQuantoTempo } from "@/lib/format";
+import { compararComHistorico, textoComparacao, type AmostraSessao } from "@/lib/treino/comparar";
 
 export const dynamic = "force-dynamic";
 
@@ -62,6 +63,70 @@ export default async function Inicio() {
       .select("exercicio_id, melhor_peso")
       .then((r) => r, () => ({ data: null })),
   ]);
+
+  /**
+   * HISTÓRICO SÓ COM OS CAMPOS DA COMPARAÇÃO, sem os filhos.
+   *
+   * A timeline traz 20 sessões com exercícios e séries aninhados; puxar o
+   * histórico inteiro naquele formato seria caro à toa. Aqui são quatro
+   * colunas por linha, e é o suficiente pra média de FC e de kcal/min.
+   *
+   * `.limit(400)` porque o PostgREST corta em 1000 por padrão e silenciosamente
+   * — um "histórico completo" sem limite explícito mentiria no dia em que
+   * passasse disso.
+   */
+  const [histSessoesRes, histCardiosRes] = await Promise.all([
+    supabase
+      .from("sessoes")
+      .select("nome, data_local, duracao_seg, calorias, fc_media")
+      .eq("status", "concluida")
+      .order("data_local", { ascending: false })
+      .limit(400)
+      .then((r) => r, () => ({ data: null })),
+    supabase
+      .from("cardios")
+      .select("tipo, data_local, duracao_min, calorias, fc_media")
+      .is("excluido_em", null)
+      .order("data_local", { ascending: false })
+      .limit(400)
+      .then((r) => r, () => ({ data: null })),
+  ]);
+
+  /**
+   * CARDIO AGRUPA POR TIPO; TREINO NÃO AGRUPA.
+   *
+   * Cardio tem que agrupar: futebol queima ~12 kcal/min e bike ~3, e a média
+   * dos dois juntos não descreve nenhum dos dois.
+   *
+   * Treino eu tinha agrupado por NOME, o que era mais preciso e INÚTIL: com
+   * cinco treinos na rotina, seriam 15 sessões até a primeira linha aparecer,
+   * e a rotina nova zerava tudo de novo. Musculação é musculação — comparada
+   * POR MINUTO, que é como a conta é feita, uma sessão de perna e uma de braço
+   * ficam comparáveis o bastante pra responder "hoje foi mais puxado que o
+   * meu normal?".
+   */
+  const histCardio = new Map<string, AmostraSessao[]>();
+  for (const c of (histCardiosRes.data ?? []) as {
+    tipo: string; data_local: string; duracao_min: number | null;
+    calorias: number | null; fc_media: number | null;
+  }[]) {
+    const lista = histCardio.get(c.tipo) ?? [];
+    lista.push({
+      dataLocal: c.data_local, minutos: c.duracao_min,
+      calorias: c.calorias, fcMedia: c.fc_media,
+    });
+    histCardio.set(c.tipo, lista);
+  }
+
+  const histTreino: AmostraSessao[] = ((histSessoesRes.data ?? []) as {
+    data_local: string; duracao_seg: number | null;
+    calorias: number | null; fc_media: number | null;
+  }[]).map((t) => ({
+    dataLocal: t.data_local,
+    minutos: t.duracao_seg ? t.duracao_seg / 60 : null,
+    calorias: t.calorias,
+    fcMedia: t.fc_media,
+  }));
 
   // A 0003 pode não ter sido rodada — a faixa some em vez de quebrar a tela.
   // Traz a série inteira do último ano: o cartão deixa você escolher o prazo
@@ -131,6 +196,12 @@ export default async function Inicio() {
         {itens.map((item) => {
           if (item.tipo === "cardio") {
             const c = item.dado;
+            const comp = textoComparacao(
+              compararComHistorico(
+                { dataLocal: c.data_local, minutos: c.duracao_min, calorias: c.calorias, fcMedia: c.fc_media },
+                histCardio.get(c.tipo) ?? [],
+              ),
+            );
             return (
               // Link, e não `article`: era a única coisa na timeline sem tela
               // própria — dava pra registrar a bike como esteira e conviver
@@ -177,11 +248,31 @@ export default async function Inicio() {
                     </span>
                   )}
                 </div>
+
+                {/* COMPARAÇÃO COM O MESMO TIPO DE SESSÃO, e só com o que veio
+                    antes. Some quando não há amostra suficiente — três
+                    sessões — em vez de escrever "sem dados". */}
+                {comp && (
+                  <p className="mt-2 pt-2 border-t border-border/60 text-[11px] text-muted">
+                    {comp} <span className="opacity-70">vs. sua média</span>
+                  </p>
+                )}
               </Link>
             );
           }
 
           const s = item.dado;
+          const compTreino = textoComparacao(
+            compararComHistorico(
+              {
+                dataLocal: s.data_local,
+                minutos: s.duracao_seg ? s.duracao_seg / 60 : null,
+                calorias: s.calorias,
+                fcMedia: s.fc_media,
+              },
+              histTreino,
+            ),
+          );
           const exs = ((s.sessao_exercicios ?? []) as unknown as ExDaTimeline[]).sort(
             (a, b) => a.ordem - b.ordem,
           );
@@ -235,6 +326,16 @@ export default async function Inicio() {
                   </span>
                 )}
               </div>
+
+              {/* Contra a média de TODOS os treinos anteriores, não só os
+                  deste nome. Por minuto, perna e braço são comparáveis o
+                  bastante — e por nome a linha só apareceria depois de 15
+                  sessões, zerando a cada rotina nova. */}
+              {compTreino && (
+                <p className="mt-2 text-[11px] text-muted">
+                  {compTreino} <span className="opacity-70">vs. sua média nos treinos</span>
+                </p>
+              )}
 
               <ul className="mt-3 flex flex-col gap-2 border-t border-border pt-3">
                 {exs.slice(0, 3).map((e) => (
