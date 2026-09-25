@@ -85,25 +85,37 @@ export function compararComHistorico(
   };
 }
 
-/**
- * Vira a linha que aparece no cartão. Devolve null quando não há o que dizer —
- * a linha não pode aparecer vazia nem escrever "sem dados".
- */
-export function textoComparacao(c: Comparacao): string | null {
-  const partes: string[] = [];
+export interface ItemComparacao {
+  rotulo: string;
+  /** Seta pronta pra renderizar. */
+  seta: "↑" | "↓" | "→";
+  /** Acima = mais intenso que o normal. */
+  direcao: "acima" | "abaixo" | "media";
+  /** Inteiro, sempre positivo — o sinal já está na seta. 0 quando na média. */
+  pct: number;
+}
 
-  const escreve = (rotulo: string, d: Desvio | null) => {
+/**
+ * Vira os itens do cartão. Lista vazia = não há o que dizer, e aí a linha
+ * inteira some — ela não pode aparecer vazia nem escrever "sem dados".
+ *
+ * A porcentagem é ARREDONDADA e sem casa decimal de propósito: a média vem de
+ * três sessões e o número do relógio varia com sono e calor. "↑ 21%" já é
+ * mais precisão do que o dado sustenta; "↑ 21,4%" seria invenção.
+ */
+export function itensComparacao(c: Comparacao): ItemComparacao[] {
+  const itens: ItemComparacao[] = [];
+
+  const push = (rotulo: string, d: Desvio | null) => {
     if (!d) return;
-    if (d.naMedia) {
-      partes.push(`${rotulo} na média`);
-      return;
-    }
     const pct = Math.round(Math.abs(d.pct) * 100);
-    partes.push(`${rotulo} ${d.pct > 0 ? "↑" : "↓"} ${pct}%`);
+    if (d.naMedia) itens.push({ rotulo, seta: "→", direcao: "media", pct: 0 });
+    else if (d.pct > 0) itens.push({ rotulo, seta: "↑", direcao: "acima", pct });
+    else itens.push({ rotulo, seta: "↓", direcao: "abaixo", pct });
   };
 
-  escreve("FC", c.fc);
-  escreve("ritmo", c.ritmo);
+  push("FC médio", c.fc);
+  push("Ritmo (kcal)", c.ritmo);
 
-  return partes.length ? partes.join(" · ") : null;
+  return itens;
 }

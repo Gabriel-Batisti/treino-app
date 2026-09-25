@@ -4,7 +4,12 @@ import { CartaoPeso } from "./cartao-peso";
 import { CalendarioMes, type DiaAtivo } from "@/components/calendario-mes";
 import { Ilustracao } from "@/components/ilustracao";
 import { hojeLocal, formatData, haQuantoTempo } from "@/lib/format";
-import { compararComHistorico, textoComparacao, type AmostraSessao } from "@/lib/treino/comparar";
+import {
+  compararComHistorico,
+  itensComparacao,
+  type AmostraSessao,
+  type ItemComparacao,
+} from "@/lib/treino/comparar";
 
 export const dynamic = "force-dynamic";
 
@@ -196,7 +201,7 @@ export default async function Inicio() {
         {itens.map((item) => {
           if (item.tipo === "cardio") {
             const c = item.dado;
-            const comp = textoComparacao(
+            const comp = itensComparacao(
               compararComHistorico(
                 { dataLocal: c.data_local, minutos: c.duracao_min, calorias: c.calorias, fcMedia: c.fc_media },
                 histCardio.get(c.tipo) ?? [],
@@ -252,17 +257,17 @@ export default async function Inicio() {
                 {/* COMPARAÇÃO COM O MESMO TIPO DE SESSÃO, e só com o que veio
                     antes. Some quando não há amostra suficiente — três
                     sessões — em vez de escrever "sem dados". */}
-                {comp && (
-                  <p className="mt-2 pt-2 border-t border-border/60 text-[11px] text-muted">
-                    {comp} <span className="opacity-70">vs. sua média</span>
-                  </p>
+                {comp.length > 0 && (
+                  <div className="mt-2 pt-2 border-t border-border/60">
+                    <LinhaComparacao itens={comp} />
+                  </div>
                 )}
               </Link>
             );
           }
 
           const s = item.dado;
-          const compTreino = textoComparacao(
+          const compTreino = itensComparacao(
             compararComHistorico(
               {
                 dataLocal: s.data_local,
@@ -331,10 +336,10 @@ export default async function Inicio() {
                   deste nome. Por minuto, perna e braço são comparáveis o
                   bastante — e por nome a linha só apareceria depois de 15
                   sessões, zerando a cada rotina nova. */}
-              {compTreino && (
-                <p className="mt-2 text-[11px] text-muted">
-                  {compTreino} <span className="opacity-70">vs. sua média nos treinos</span>
-                </p>
+              {compTreino.length > 0 && (
+                <div className="mt-2">
+                  <LinhaComparacao itens={compTreino} />
+                </div>
               )}
 
               <ul className="mt-3 flex flex-col gap-2 border-t border-border pt-3">
@@ -355,6 +360,46 @@ export default async function Inicio() {
         })}
       </section>
     </main>
+  );
+}
+
+/**
+ * A linha de comparação com a média.
+ *
+ * VERDE É PRA CIMA. Aqui subir é intensidade: FC mais alta e mais caloria por
+ * minuto significam sessão mais puxada que o seu normal. Não confundir com o
+ * cartão de PESO, onde a cor segue o objetivo e subir pode ser âmbar — lá o
+ * número é resultado, aqui é esforço.
+ *
+ * "Na média" fica cinza com seta lateral: é informação, não conquista nem
+ * alerta.
+ */
+function LinhaComparacao({ itens }: { itens: ItemComparacao[] }) {
+  return (
+    <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted">
+      {itens.map((i) => (
+        <span key={i.rotulo}>
+          {i.rotulo}:{" "}
+          <span
+            aria-label={
+              i.direcao === "media" ? "na média" : `${i.direcao} da média`
+            }
+            className={`text-sm leading-none font-medium ${
+              i.direcao === "acima"
+                ? "text-emerald-400"
+                : i.direcao === "abaixo"
+                  ? "text-red-400"
+                  : "text-muted"
+            }`}
+          >
+            {i.seta}
+            {i.direcao !== "media" && (
+              <span className="ml-0.5 text-[11px] tabular-nums">{i.pct}%</span>
+            )}
+          </span>
+        </span>
+      ))}
+    </p>
   );
 }
 
