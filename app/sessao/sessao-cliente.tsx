@@ -47,6 +47,7 @@ export function SessaoCliente() {
             nome: e.nome,
             modoMedicao: e.modoMedicao,
             seriesAlvo: e.seriesAlvo ?? Math.max(d?.series.length ?? 0, 1),
+            rotinaExercicioId: e.rotinaExercicioId || null,
             seriesBackup: e.seriesBackup ?? 0,
             backupPctCarga: e.backupPctCarga ?? null,
             backupDescansoSeg: e.backupDescansoSeg ?? null,

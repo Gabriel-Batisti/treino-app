@@ -58,6 +58,12 @@ export interface ExercicioDaSessao {
   nome: string;
   modoMedicao: string;
   seriesAlvo: number;
+  /**
+   * Id da linha em `rotina_exercicios`. É por ele que a mudança de descanso
+   * feita no meio do treino volta pra rotina. Null em treino livre e em
+   * exercício adicionado na hora — aí a mudança vale só pra hoje.
+   */
+  rotinaExercicioId: string | null;
   /** Quantas das ÚLTIMAS séries são backup. Contadas dentro de seriesAlvo. */
   seriesBackup: number;
   /** % da carga da última série de trabalho que a backup sugere. 70 = −30%. */
@@ -206,11 +212,22 @@ function mmss(seg: number): string {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
+/** Mesmos passos da tela da rotina: escolha curta, não campo livre. */
+const OPCOES_DESCANSO = [0, 30, 45, 60, 90, 120, 150, 180, 240, 300];
+
+/**
+ * 45 → "45s", 120 → "2min", 90 → "1min 30s".
+ *
+ * Antes devolvia "0min 30s" e "2min 0s". Passou a incomodar quando virou
+ * rótulo de BOTÃO no seletor: "0min 30s" ocupa a largura toda pra dizer meio
+ * minuto, e numa grade de três colunas isso quebra a linha.
+ */
 function formatDescanso(seg: number | null): string {
   if (!seg) return "—";
   const m = Math.floor(seg / 60);
   const s = seg % 60;
-  return s ? `${m}min ${s}s` : `${m}min 0s`;
+  if (!m) return `${s}s`;
+  return s ? `${m}min ${s}s` : `${m}min`;
 }
 
 export function SessaoAtiva({
@@ -251,6 +268,9 @@ export function SessaoAtiva({
    * ＋ Adicionar põe no fim da lista; "escolher outro" na tela de substituição
    * troca NO LUGAR. Um booleano não distinguia os dois.
    */
+  /** Índice do exercício com o seletor de descanso aberto. */
+  const [editandoDescanso, setEditandoDescanso] = useState<number | null>(null);
+
   const [seletor, setSeletor] = useState<
     { modo: "adicionar" } | { modo: "trocar"; exIdx: number } | null
   >(null);
@@ -584,6 +604,34 @@ export function SessaoAtiva({
   }
 
   /**
+   * Troca o descanso do exercício NO MEIO DO TREINO.
+   *
+   * Vale pra hoje NA HORA — por isso o estado local muda primeiro, e o envio
+   * vai pra fila logo atrás (D-007). Sem sinal na academia o timer já passa a
+   * contar certo, e a rotina se atualiza quando a rede voltar.
+   *
+   * E vale PRA SEMPRE, não só pra hoje: se você descobriu no aparelho que 90s
+   * é pouco, isso é a descoberta, não um acidente do dia. Exercício sem linha
+   * na rotina (treino livre, ou adicionado agora) muda só a sessão — não há
+   * onde gravar.
+   */
+  function escolherDescanso(exIdx: number, seg: number) {
+    setEditandoDescanso(null);
+    const ex = exercicios[exIdx];
+    setExercicios((prev) => {
+      const cp = structuredClone(prev);
+      cp[exIdx].descansoSeg = seg;
+      return cp;
+    });
+    if (!rotinaId || !ex.rotinaExercicioId) return;
+    void enfileirar({
+      id: crypto.randomUUID(),
+      tipo: "rotina_descanso",
+      payload: { rotinaExercicioId: ex.rotinaExercicioId, rotinaId, descansoSeg: seg },
+    }).then(() => sincronizar());
+  }
+
+  /**
    * Tira uma série da sessão e renumera as de baixo.
    *
    * Renumerar importa: `indice` é o que casa a série com o "anterior" da
@@ -636,6 +684,7 @@ export function SessaoAtiva({
         seriesAlvo: quantasSeries,
         // Entrou no meio do treino, fora da rotina: não há prescrição de
         // backup nem nota de coach pra herdar.
+        rotinaExercicioId: null,
         seriesBackup: 0,
         backupPctCarga: null,
         backupDescansoSeg: null,
@@ -938,9 +987,51 @@ export function SessaoAtiva({
               className="mt-1 w-full bg-transparent text-xs text-muted outline-none placeholder:text-muted/60"
             />
 
-            <p className="mt-1 text-[11px] text-muted">
-              ⏱ Descanso: {formatDescanso(ex.descansoSeg)}
-            </p>
+            {/* O DESCANSO É EDITÁVEL AQUI, e não só na tela da rotina: é no
+                aparelho, entre uma série e outra, que você descobre que 90s é
+                pouco — e ter que voltar pra rotina pra corrigir significa não
+                corrigir. Alvo de 44px, como todo toque desta tela. */}
+            <div className="relative mt-1">
+              <button
+                onClick={() =>
+                  setEditandoDescanso((v) => (v === exIdx ? null : exIdx))
+                }
+                aria-expanded={editandoDescanso === exIdx}
+                className="-ml-1 flex min-h-11 items-center px-1 text-[11px] text-accent"
+              >
+                ⏱ Descanso: {formatDescanso(ex.descansoSeg)}
+                <span className="ml-1 opacity-70">▾</span>
+              </button>
+
+              {editandoDescanso === exIdx && (
+                <>
+                  {/* Fecha ao tocar fora. Sem isto o painel ficaria aberto
+                      cobrindo a primeira série enquanto você treina. */}
+                  <button
+                    aria-label="fechar"
+                    onClick={() => setEditandoDescanso(null)}
+                    className="fixed inset-0 z-20 cursor-default"
+                  />
+                  <div className="absolute left-0 top-full z-30 mt-1 grid grid-cols-3 gap-1 rounded-xl border border-border bg-card p-1.5 shadow-lg">
+                    {OPCOES_DESCANSO.map((seg) => (
+                      <button
+                        key={seg}
+                        onClick={() => escolherDescanso(exIdx, seg)}
+                        className={`min-h-11 rounded-lg px-3 text-xs tabular-nums ${
+                          seg === (ex.descansoSeg ?? 0)
+                            ? "bg-accent font-medium text-black"
+                            : "bg-background text-foreground"
+                        }`}
+                      >
+                        {/* formatDescanso(0) devolve "—", que como rótulo de
+                            botão não diz nada. Aqui zero tem nome. */}
+                        {seg === 0 ? "Sem timer" : formatDescanso(seg)}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
 
             <div className="mt-2 grid grid-cols-[1.6rem_4.2rem_1fr_1fr_2.75rem] gap-2 text-[10px] uppercase tracking-wide text-muted">
               <span className="text-center">Sér</span>
