@@ -156,17 +156,29 @@ export default async function Inicio() {
       .map((r) => [r.exercicio_id, r.melhor_peso]),
   );
 
-  // Dias ativos do calendário: treino e cardio contam separado.
+  /**
+   * Dias ativos do calendário: treino e cardio contam separado.
+   *
+   * VEM DO HISTÓRICO, não das 20 sessões da timeline. Com as 20, o mês
+   * corrente saía certo por sorte e SETEMBRO PRA TRÁS saía furado — voltar
+   * um mês mostrava metade dos dias. Ninguém tinha reparado porque a contagem
+   * vivia só no "18 dias ativos"; com o número na legenda, o furo passaria a
+   * ser um número errado na cara.
+   *
+   * O histórico já estava carregado aqui pra comparação com a média, então
+   * isto não custa consulta nenhuma.
+   */
   const mapaDias = new Map<string, DiaAtivo>();
-  for (const s of sessoes ?? []) {
-    const d = mapaDias.get(s.data_local) ?? { data: s.data_local, treino: false, cardio: false };
-    d.treino = true;
-    mapaDias.set(s.data_local, d);
+  const marcar = (data: string, chave: "treino" | "cardio") => {
+    const d = mapaDias.get(data) ?? { data, treino: false, cardio: false };
+    d[chave] = true;
+    mapaDias.set(data, d);
+  };
+  for (const s of (histSessoesRes.data ?? []) as { data_local: string }[]) {
+    marcar(s.data_local, "treino");
   }
-  for (const c of cardios) {
-    const d = mapaDias.get(c.data_local) ?? { data: c.data_local, treino: false, cardio: false };
-    d.cardio = true;
-    mapaDias.set(c.data_local, d);
+  for (const c of (histCardiosRes.data ?? []) as { data_local: string }[]) {
+    marcar(c.data_local, "cardio");
   }
 
   // Uma linha do tempo só, treino e cardio misturados por data.

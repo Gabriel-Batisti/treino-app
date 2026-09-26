@@ -32,9 +32,18 @@ export function CalendarioMes({ dias, hoje }: { dias: DiaAtivo[]; hoje: string }
   const totalDias = new Date(visivel.ano, visivel.mes, 0).getDate();
   const vazios = primeiro.getDay();
 
-  const ativosNoMes = dias.filter((d) =>
+  const doMes = dias.filter((d) =>
     d.data.startsWith(`${visivel.ano}-${String(visivel.mes).padStart(2, "0")}`),
-  ).length;
+  );
+  const ativosNoMes = doMes.length;
+  /**
+   * Conta DIAS, não sessões — é o que as bolinhas desenham, e o resumo tem
+   * que bater com o que está na tela. Dia com treino E cardio entra nos dois,
+   * então a soma passa de "dias ativos" de propósito: são 18 dias, 14 com
+   * treino e 9 com cardio, e cinco deles tiveram os dois.
+   */
+  const comTreino = doMes.filter((d) => d.treino).length;
+  const comCardio = doMes.filter((d) => d.cardio).length;
 
   function mover(delta: number) {
     setVisivel(({ ano, mes }) => {
@@ -98,16 +107,25 @@ export function CalendarioMes({ dias, hoje }: { dias: DiaAtivo[]; hoje: string }
         })}
       </div>
 
-      <div className="mt-3 flex gap-4 text-[10px] text-muted">
+      {/* O NÚMERO MORA NA LEGENDA, não numa linha nova: a legenda já diz o
+          que cada bolinha é, e "treino 14" responde "quantos?" no mesmo
+          lugar onde você pergunta "o que é isso?". Uma linha separada de
+          resumo repetiria as mesmas três palavras. */}
+      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-[10px] text-muted">
         <span className="flex items-center gap-1.5">
           <span className="size-2.5 rounded-full bg-accent" /> treino
+          <span className="tabular-nums text-foreground">{comTreino}</span>
         </span>
         <span className="flex items-center gap-1.5">
           <span className="size-2.5 rounded-full border border-accent" /> cardio
+          <span className="tabular-nums text-foreground">{comCardio}</span>
         </span>
         <span className="flex items-center gap-1.5">
           <span className="size-2.5 rounded-full bg-accent ring-1 ring-offset-1 ring-accent/70 ring-offset-card" />{" "}
           os dois
+          <span className="tabular-nums text-foreground">
+            {doMes.filter((d) => d.treino && d.cardio).length}
+          </span>
         </span>
       </div>
     </div>
